@@ -18,6 +18,7 @@ Below I'll leave some images and videos of how it worked, prints of the bot's UI
 
 ## 🟢 Features
 
+- WORKS ON TIBIA GLOBAL ✔️
 - 100% FULL AUTO ✔️
 - CAVEBOT WITH WAYPOINTS (COORDINATES NOT CLICKMAP) ✔️
 - REFILER ✔️
@@ -40,7 +41,7 @@ Below I'll leave some images and videos of how it worked, prints of the bot's UI
 
 ## 🔴 HARDWARE REQUIREMENTS
 
-This bot needs good processing power to work properly (fast) i tested it with weak machines and didn't succeed, of the 3 machines i had running bots they all had a ryzen 5 5600 (6 core/12 threads +- 3. 5ghz), use an equal or superior processor (or you can also use a worse one but overclock it), in addition to less input detection I chose to use a leonardo arduino to simulate mouse and keyboard inputs, you need a leonardo arduino to use this bot, if you don't have one you can change the source manually to use pyautogui or derivatives, or use a driver, but note that this may result in easier detection, inside the source I will leave a . ino file with the arduino code, just send it to your arduino leonardo and it will work (remember to leave the arduino as the standard COM33 port, otherwise the bot will not work), I also recommend spoofing the arduino (it's not necessary to run the project) so that it doesn't have the id of the arduino board but that of some input device (mouse/keyboard), thus making detection more difficult.
+This bot needs good processing power to work properly (fast) i tested it with weak machines and didn't succeed, of the 3 machines i had running bots they all had a ryzen 5 5600 (6 core/12 threads +- 3.5ghz), use an equal or superior processor (or you can also use a worse one but overclock it), in addition to less input detection I chose to use a leonardo arduino to simulate mouse and keyboard inputs, you need a leonardo arduino to use this bot, if you don't have one you can change the source manually to use pyautogui or derivatives, or use a driver, but note that this may result in easier detection, inside the source I will leave a . ino file with the arduino code, just send it to your arduino leonardo and it will work (remember to leave the arduino as the standard COM33 port, otherwise the bot will not work), I also recommend spoofing the arduino (it's not necessary to run the project) so that it doesn't have the id of the arduino board but that of some input device (mouse/keyboard), thus making detection more difficult.
 
 ![Arduino](docs/assets/images/arduino.png)
 
@@ -73,6 +74,8 @@ YOU NEED TO USE THIS CONFIGS IN YOUR CLIENT, OTHERWISE WILL NOT WORK
 ![Gameplay](docs/assets/images/gameplay.png)
 
 ## ⚙️ HOW TO SETUP
+
+🔴 USE AT YOUR OWN RISK
 
 - DOWNLOAD AND INSTALL THE SOFTWARE DEPENDENCIES
 
