@@ -16,11 +16,22 @@ Below I'll leave some images and videos of how it worked, prints of the bot's UI
 
 ### [You can see videos of it working on my Youtube channel](https://www.youtube.com/channel/UC4uyI035S2h0z862wpYVqXA)
 
+## 📝 CAVEBOT SCRIPTS (SEE SCRIPTS FOLDER)
+
+- DRAKEN WALLS NORTH ✔️
+- MINOTAUR CULT -1 AND -2 ✔️
+
 ## 🟢 Features
 
 - WORKS ON TIBIA GLOBAL ✔️
 - 100% FULL AUTO ✔️
 - CAVEBOT WITH WAYPOINTS (COORDINATES NOT CLICKMAP) ✔️
+- SAVE AND SHARE CAVEBOT SCRIPTS ✔️
+- CONFIGURABLE HOTKEYS ✔️
+- CAITING CREATURES OVER BOXES ✔️
+- OPEN DOORS, TRAVEL, CLICK ON BOATS ✔️
+- IGNORE CREATURES ✔️
+- DROP LOOT ON THE GROUND ✔️
 - REFILER ✔️
 - DEPOSITER ✔️
 - WALK OVER THE FIRE ✔️
@@ -54,6 +65,31 @@ TESTED ONLY ON WIN10
 - [PYTHON 3.11.7](https://www.python.org/downloads/release/python-3117/)
 - [POETRY](https://python-poetry.org/)
 - [TESSERACT-WINDOWS](https://github.com/UB-Mannheim/tesseract/wiki)
+- [VIRTUAL DISPLAY](https://www.amyuni.com/downloads/usbmmidd_v2.zip&v=ybHKFZjSkVY)
+- [OBS](https://obsproject.com/pt-br/download)
+
+COMMANDS TO ACTIVATE THE VIRTUAL DISPLAY:
+
+- Extract the file, then:
+
+```bash
+cd C:\DIRECTORY\OF\EXTRACTED\FOLDER
+deviceinstaller64 install usbmmidd.inf usbmmidd
+```
+
+-Add virtual display:
+
+```bash
+deviceinstaller64 enableidd 1
+```
+
+Once you have the second monitor activated, make sure your resolution is 1920x1080, then just open obs, add a game capture, select tibia and remove the pointer, then just open the game capture in windowed mode and click to maximise the window (windowed fullscreen)
+
+OBS: If you have more than one physical screen, switch them all off and stick with just one
+
+🔴 **IMPORTANT** YOU NEED TO REMOVE THE POINTER FROM THE OBS GAME CAPTURE, OTHERWISE IT MAY RESULT IN BUGS
+
+⚠️ **OPTIONAL** IF YOU WANT, SPOOF THE VIRTUAL DISPLAY FOR LESS DETECTION
 
 ## 🔴 TIBIA CONFIG REQUIREMENTS
 
