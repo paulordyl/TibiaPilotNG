@@ -1,0 +1,18 @@
+[package]
+name = "rust_bot_ng"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+thiserror = "1.0"
+log = "0.4"
+env_logger = "0.9"
+serialport = "4.2"
+base64 = "0.13"
+screenshots = "0.5" # For screen capture
+image = "0.24"      # For image manipulation
+opencv = { version = "0.84", features = ["imgproc", "highgui"] } # For image processing, including necessary features
+serde = { version = "1.0", features = ["derive"] } # For serialization/deserialization
+toml = "0.8" # For TOML parsing

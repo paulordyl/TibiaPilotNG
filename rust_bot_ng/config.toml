@@ -1,0 +1,11 @@
+[general]
+character_name = "RustBotUser"
+auto_login = false
+
+[arduino]
+port = "/dev/ttyUSB0" # or "COM3" for Windows
+baud_rate = 115200
+
+[hotkeys]
+heal = "f1"
+attack_spell = "f2"
