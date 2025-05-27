@@ -147,6 +147,107 @@ fn _get_roi_from_mat(mat: &Mat, x: i32, y: i32, width: i32, height: i32) -> Resu
     Mat::roi(mat, rect).map_err(|e| AppError::ImageProcessingError(format!("Failed to get ROI: {}", e)))
 }
 
+/// Locates all non-overlapping occurrences of a template image within a larger image.
+///
+/// # Arguments
+/// * `haystack` - The larger image in which to search.
+/// * `needle` - The template image to search for.
+/// * `confidence_threshold` - A float between 0.0 and 1.0. Matches below this threshold are ignored.
+/// * `max_overlap` - Not strictly used in the current "clearing" NMS, but a parameter for future, more advanced NMS.
+///                   The current method clears a region the size of the needle around a found match.
+///
+/// # Returns
+/// `Ok(Vec<(i32, i32, u32, u32)>)` containing all found locations `(x, y, width, height)`.
+/// `Err(AppError)` if an error occurs during processing.
+#[allow(unused_variables)] // max_overlap is not used yet
+pub fn locate_all_templates_on_image(
+    haystack: &DynamicImage,
+    needle: &DynamicImage,
+    confidence_threshold: f32,
+    max_overlap: f32, // For future NMS
+) -> Result<Vec<(i32, i32, u32, u32)>, AppError> {
+    info!("Attempting to locate all occurrences of a template on image.");
+
+    let haystack_mat = dynamic_image_to_mat(haystack)?;
+    let needle_mat = dynamic_image_to_mat(needle)?;
+
+    if needle_mat.cols() > haystack_mat.cols() || needle_mat.rows() > haystack_mat.rows() {
+        error!("Needle dimensions are larger than haystack dimensions.");
+        return Err(AppError::ImageProcessingError(
+            "Needle dimensions cannot be larger than haystack dimensions".to_string(),
+        ));
+    }
+
+    let mut result_mat = Mat::default();
+    imgproc::match_template(&haystack_mat, &needle_mat, &mut result_mat, imgproc::TM_CCOEFF_NORMED, &Mat::default())
+        .map_err(|e| AppError::ImageProcessingError(format!("OpenCV template matching failed: {}", e)))?;
+
+    let mut found_locations: Vec<(i32, i32, u32, u32)> = Vec::new();
+    let needle_width = needle_mat.cols();
+    let needle_height = needle_mat.rows();
+
+    loop {
+        let mut min_val = 0.0;
+        let mut max_val = 0.0;
+        let mut min_loc = core::Point::new(0, 0);
+        let mut max_loc = core::Point::new(0, 0);
+
+        core::min_max_loc(&result_mat, Some(&mut min_val), Some(&mut max_val), Some(&mut min_loc), Some(&mut max_loc), &Mat::default())
+            .map_err(|e| AppError::ImageProcessingError(format!("Failed to find min/max location in result matrix: {}", e)))?;
+
+        if max_val >= confidence_threshold as f64 {
+            info!(
+                "Found template match at ({}, {}) with confidence {:.2}",
+                max_loc.x, max_loc.y, max_val
+            );
+            found_locations.push((max_loc.x, max_loc.y, needle_width as u32, needle_height as u32));
+
+            // "Clear" or "mask out" the region of this found match in the result matrix.
+            // This is a simple way to prevent finding the same match again.
+            // The region to clear is centered around max_loc and is typically related to needle size.
+            // For simplicity, we clear a rectangle of the needle's size.
+            // A more sophisticated NMS might use `max_overlap`.
+            let clear_rect_x = max_loc.x - needle_width / 2; // Start clearing a bit to the left of the found match
+            let clear_rect_y = max_loc.y - needle_height / 2; // Start clearing a bit above the found match
+            
+            // Ensure clear_rect coordinates are within the bounds of result_mat
+            let roi_x = core::max(0, clear_rect_x) as i32;
+            let roi_y = core::max(0, clear_rect_y) as i32;
+
+            // Calculate width and height of ROI, ensuring it doesn't exceed result_mat dimensions
+            let roi_width = core::min(needle_width, result_mat.cols() - roi_x) as i32;
+            let roi_height = core::min(needle_height, result_mat.rows() - roi_y) as i32;
+
+            if roi_width > 0 && roi_height > 0 {
+                let mut roi = Mat::roi(&mut result_mat, Rect_::new(roi_x, roi_y, roi_width, roi_height))
+                    .map_err(|e| AppError::ImageProcessingError(format!("Failed to get ROI for clearing: {}", e)))?;
+                
+                // Set this region to a value below the threshold (e.g., 0 or min_val - epsilon)
+                roi.set_to(core::Scalar::new(min_val - 0.1, 0.0, 0.0, 0.0)) // Set to a low value
+                    .map_err(|e| AppError::ImageProcessingError(format!("Failed to clear region in result matrix: {}", e)))?;
+                debug!("Cleared region around ({}, {}) in result matrix.", max_loc.x, max_loc.y);
+            } else {
+                debug!("Skipping clear for match at ({},{}) as calculated ROI is invalid (width/height <=0)", max_loc.x, max_loc.y);
+                 // If the ROI is invalid (e.g. match at edge), we might risk an infinite loop if this match isn't properly suppressed.
+                 // For now, we break to avoid potential infinite loops if clearing fails at edges.
+                 // A more robust solution might be needed if this becomes an issue.
+                 // One simple fix: ensure at least a 1x1 area around max_loc itself is cleared.
+                 if result_mat.cols() > max_loc.x && result_mat.rows() > max_loc.y {
+                     result_mat.at_2d_mut::<core::Vec<f32, 1>>(max_loc.y, max_loc.x).unwrap()[0] = min_val as f32 - 0.1f32;
+                 }
+                 // Break if we can't clear properly to avoid issues, or handle more gracefully.
+                 // break; 
+            }
+        } else {
+            info!("No more matches found with confidence >= {:.2}. Max found was {:.2}", confidence_threshold, max_val);
+            break; // No more matches above threshold
+        }
+    }
+
+    info!("Found {} locations in total for the template.", found_locations.len());
+    Ok(found_locations)
+}
+
 
 use crate::image_processing::{templates::TemplateManager, cache::DetectionCache}; // Added DetectionCache
 use crate::screen_capture::capture; // Import screen capture functions

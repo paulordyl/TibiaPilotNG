@@ -23,11 +23,26 @@ pub struct GeneralSettings {
     // TODO: Add other general settings
 }
 
+#[derive(Deserialize, Debug, Clone)]
+pub struct ScreenRegion {
+    pub x: i32,
+    pub y: i32,
+    pub width: u32,
+    pub height: u32,
+}
+
+#[derive(Deserialize, Debug, Clone)]
+pub struct PlayerStatusRegions {
+    pub hp: ScreenRegion,
+    pub mp: ScreenRegion,
+}
+
 #[derive(Deserialize, Debug, Clone)] // Added Clone
 pub struct Config {
     pub general: GeneralSettings,
     pub arduino: ArduinoConfig,
     pub hotkeys: HotkeyConfig,
+    pub player_status_regions: PlayerStatusRegions, // Added player status regions
 }
 
 /// Loads configuration from a TOML file.

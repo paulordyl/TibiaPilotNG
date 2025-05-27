@@ -8,16 +8,20 @@ use std::{sync::Arc, thread, time::Duration};
 // Placeholder for all dependencies the Cavebot might need to execute actions.
 // This will be fleshed out as other modules (input, screen interaction, etc.) are integrated.
 use crate::{
+    config, // Added config
     input::{self, arduino::ArduinoCom},
-    image_processing::{cache::DetectionCache, templates::TemplateManager}, // Added TemplateManager and DetectionCache
+    image_processing::{cache::DetectionCache, templates::TemplateManager},
 };
-use std::sync::{Arc, Mutex}; // Added Mutex
+use std::sync::{Arc, Mutex};
 
+// Added derive(Clone) to allow easier sharing between threads if needed
+#[derive(Clone)]
 pub struct AllDependencies {
     pub arduino_com: Arc<Mutex<ArduinoCom>>,
     pub template_manager: Arc<TemplateManager>,
     pub detection_cache: Arc<DetectionCache>,
-    // pub screen_handler: Option<Arc<ScreenHandler>>, // Example: Screen interaction (capture, find)
+    pub config: Arc<config::settings::Config>, // Added config
+                                               // pub screen_handler: Option<Arc<ScreenHandler>>, // Example: Screen interaction (capture, find)
 }
 
 impl AllDependencies {
@@ -26,11 +30,13 @@ impl AllDependencies {
         arduino_com: Arc<Mutex<ArduinoCom>>,
         template_manager: Arc<TemplateManager>,
         detection_cache: Arc<DetectionCache>,
+        config: Arc<config::settings::Config>, // Added config
     ) -> Self {
         Self {
             arduino_com,
             template_manager,
             detection_cache,
+            config, // Added config
         }
     }
 }

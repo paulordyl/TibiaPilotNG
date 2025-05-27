@@ -135,14 +135,19 @@ fn main() -> Result<(), AppError> {
     use std::time::Duration;
     
     // Initialize TemplateManager and load templates
+    // TemplateManager::load_templates_from_directory will recursively load from subdirectories like "templates/digits/"
     let mut template_manager = TemplateManager::new();
     match template_manager.load_templates_from_directory("rust_bot_ng/templates") {
-        Ok(_) => info!("Templates loaded successfully from rust_bot_ng/templates/"),
+        Ok(_) => info!("Templates loaded successfully from rust_bot_ng/templates/ (including subdirectories like digits/ if present)."),
         Err(e) => {
             error!("Failed to load templates from rust_bot_ng/templates/: {}. Proceeding with empty TemplateManager.", e);
             // This might be acceptable if templates are optional or only for specific features.
         }
     }
+    // TODO: PlayerMonitor will eventually call image_processing::digit_recognition::recognize_digits_in_region,
+    //       passing a captured screen region (e.g., HP bar area) and the template_manager_arc.
+    //       Example call within PlayerMonitor:
+    //       let hp_value = recognize_digits_in_region(&hp_bar_image, &template_manager, "digit_")?;
     let template_manager_arc = Arc::new(template_manager);
     
     // Initialize DetectionCache
@@ -156,6 +161,16 @@ fn main() -> Result<(), AppError> {
         heal_hotkey: config.hotkeys.heal.clone(),
     };
     info!("BotSettings initialized with heal_hotkey: {}", bot_settings.heal_hotkey);
+
+    // Access player status regions from config for potential use by PlayerMonitor
+    info!("HP Region from config: x={}, y={}, w={}, h={}",
+        config.player_status_regions.hp.x,
+        config.player_status_regions.hp.y,
+        config.player_status_regions.hp.width,
+        config.player_status_regions.hp.height
+    );
+    // TODO: PlayerMonitor will eventually use config.player_status_regions.hp and .mp
+    //       to define areas for screen capture and OCR/image analysis.
 
     // Initialize GameContext with BotSettings derived from config
     let game_context = Arc::new(GameContext::new(bot_settings));
@@ -175,89 +190,36 @@ fn main() -> Result<(), AppError> {
     // cavebot.add_waypoint(Waypoint::new("Go to monsters".to_string(), WaypointType::Walk, (150, 250, 6)));
     // info!("Cavebot initialized with {} waypoints.", cavebot.waypoints_count());
 
-    // Initialize dependencies for Cavebot
-    // let cavebot_deps = CavebotDeps::new(
-    //     Arc::clone(&arduino_com_instance),
-    //     Arc::clone(&template_manager_arc),
-    //     Arc::clone(&detection_cache_arc)
-    // );
-    // info!("Cavebot dependencies initialized.");
+    // Initialize Arc for config to share with AllDependencies
+    let config_arc = Arc::new(config);
+
+    // Initialize dependencies (AllDependencies)
+    // This will be shared among threads that need it (Cavebot, PlayerMonitor)
+    let all_deps = AllDependencies::new(
+        Arc::clone(&arduino_com_instance),
+        Arc::clone(&template_manager_arc),
+        Arc::clone(&detection_cache_arc),
+        Arc::clone(&config_arc), // Pass Arc-cloned config
+    );
+    info!("AllDependencies initialized.");
 
     // Initialize PlayerMonitor
-    // let player_monitor = PlayerMonitor::new(Arc::clone(&game_context));
-    // info!("PlayerMonitor initialized.");
+    let player_monitor = PlayerMonitor::new(Arc::clone(&game_context));
+    info!("PlayerMonitor initialized.");
 
     // Spawn PlayerMonitor loop in a separate thread
-    // let player_monitor_deps_clone = cavebot_deps.clone(); // Assuming AllDependencies is Clone or we clone its Arcs
-                                                            // If AllDependencies is not Clone, we'd pass references to Arcs if possible,
-                                                            // or restructure how deps are shared if monitor needs its own long-lived copy.
-                                                            // For now, let's assume `deps` can be passed by reference or its Arcs cloned.
-                                                            // The current AllDependencies struct is not Clone because ArduinoCom is not.
-                                                            // However, PlayerMonitor's loop takes &AllDependencies and doesn't store it.
-                                                            // So, we can pass a reference if the lifetime allows, or clone Arcs inside deps.
-                                                            // For simplicity, if cavebot_deps is also Arc-wrapped or its fields are,
-                                                            // we can clone those Arcs.
-                                                            // Let's assume cavebot_deps itself is Arc-wrapped for this example, or we pass its components.
-                                                            // For now, we pass reference `&cavebot_deps` as PlayerMonitor does not store it.
-                                                            // If PlayerMonitor was to be long-lived AND store deps, deps would need to be Arc or fields clonable.
+    let player_monitor_handle = {
+        let monitor_game_context = Arc::clone(&game_context);
+        let monitor_deps = all_deps.clone(); // Clone AllDependencies for the new thread
+        let player_monitor_instance = player_monitor; // Move monitor into thread
 
-    // let player_monitor_handle = {
-    //     let monitor_game_context = Arc::clone(&game_context);
-    //     // If cavebot_deps is Arc-wrapped: let monitor_deps = Arc::clone(&cavebot_deps);
-    //     // If passing by reference and cavebot_deps has suitable lifetime (e.g. main scope):
-    //     // let monitor_deps_ref = &cavebot_deps; // This is tricky if cavebot_deps is moved to another thread.
-    //     // A common pattern is to make AllDependencies fields Arc, so they can be cloned.
-    //     // Let's assume cavebot_deps is structured with Arcs that can be cloned for the monitor.
-    //     // For this example, we'll pass a newly created AllDependencies for monitor if it had distinct needs,
-    //     // or ensure cavebot_deps is cloneable or its parts are.
-    //     // Given PlayerMonitor's current simulated nature, it doesn't use deps.
-    //     // So we can pass the existing `cavebot_deps` by reference if lifetimes match,
-    //     // or a temporary one if we are careful about lifetimes.
-    //     // The Cavebot thread below will move `cavebot_deps`.
-    //     // So, `cavebot_deps` must be `Clone` or its components must be `Arc` and individually cloned.
-    //     // The current AllDependencies is not Clone.
-    //     // Let's make it cloneable by wrapping its fields in Arc, or make it Arc itself.
-    //     // For this example, we'll assume AllDependencies is made cloneable or its contents are Arc-cloned.
-    //     // Let's just pass a reference for now, and acknowledge this is a point of attention for multi-threading.
-    //     // The simplest way if PlayerMonitor doesn't *store* deps, is to pass a reference.
-    //     // But since cavebot_deps is moved to the cavebot thread, we need a clone or separate instance.
-    //     // Let's assume we create a separate AllDependencies for the monitor or make it cloneable.
-    //     // For now, we will pass the same `cavebot_deps` by reference, which means the PlayerMonitor thread
-    //     // must finish before cavebot_deps is dropped or moved. This is not ideal.
-    //     // A better approach: make AllDependencies Clone or clone its Arc fields.
-    //     // Let's assume AllDependencies can be cloned or we clone its Arcs for the monitor thread.
-        
-        // To make this runnable, AllDependencies needs to be Clone or its fields Arc-cloned.
-        // Let's assume for the example that AllDependencies is cloneable.
-        // If not, this part needs adjustment (e.g. cloning individual Arcs from cavebot_deps).
-        // For simplicity, let's assume CavebotDeps is cloneable.
-        // This would require `arduino_com: Arc<Mutex<ArduinoCom>>` etc. to be `Clone` which `Arc` is.
-        // So, `CavebotDeps` itself needs to derive `Clone`.
-        
-        // CavebotDeps would need to be:
-        // #[derive(Clone)]
-        // pub struct AllDependencies { ... Arc fields ... }
-        // For now, player_monitor.run_monitoring_loop doesn't use deps, so we can pass a temporary one or a reference.
-        // However, the signature requires it.
-
-        // Let's assume `cavebot_deps` is available and can be referenced or its parts cloned.
-        // Since `player_monitor.run_monitoring_loop` doesn't use `deps` yet, we can pass a placeholder or the real one.
-        // The main issue is if `cavebot_deps` is moved to the cavebot thread.
-        // So, the monitor thread needs its own copy or a reference that outlives its use.
-
-    //     let monitor_deps_placeholder = CavebotDeps::new( // Create a new one for monitor thread if needed
-    //         Arc::clone(&arduino_com_instance),          // or ensure cavebot_deps is Clone
-    //         Arc::clone(&template_manager_arc),
-    //         Arc::clone(&detection_cache_arc)
-    //     );
-
-    //     thread::spawn(move || {
-    //         info!("PlayerMonitor thread started.");
-    //         player_monitor.run_monitoring_loop(&monitor_deps_placeholder); // Pass appropriate deps
-    //         info!("PlayerMonitor thread finished.");
-    //     })
-    // };
-    // info!("PlayerMonitor loop started in a separate thread.");
+        thread::spawn(move || {
+            info!("PlayerMonitor thread started.");
+            player_monitor_instance.run_monitoring_loop(&monitor_deps);
+            info!("PlayerMonitor thread finished.");
+        })
+    };
+    info!("PlayerMonitor loop started in a separate thread.");
 
     // Initialize Healer
     // let healer = Healer::new(Arc::clone(&game_context), Arc::clone(&arduino_com_instance));
@@ -286,17 +248,15 @@ fn main() -> Result<(), AppError> {
 
 
     // Example of starting Cavebot in a separate thread
-    let cavebot_deps = CavebotDeps::new(
-        Arc::clone(&arduino_com_instance),
-        Arc::clone(&template_manager_arc),
-        Arc::clone(&detection_cache_arc)
-    );
-    info!("Cavebot dependencies initialized.");
+    // Note: cavebot_deps (now all_deps) is cloned for the cavebot thread implicitly if we pass it directly
+    // or we explicitly clone it if we need to use all_deps later in main thread for other purposes.
+    // Since AllDependencies is now Clone, we can clone it for each thread.
     let cavebot_thread_handle = {
         let mut cavebot_instance = cavebot; 
+        let cavebot_deps_clone = all_deps.clone(); // Explicitly clone for clarity
         std::thread::spawn(move || {
             info!("Cavebot thread started.");
-            cavebot_instance.run_main_loop(&cavebot_deps);
+            cavebot_instance.run_main_loop(&cavebot_deps_clone);
             info!("Cavebot thread finished.");
         })
     };
@@ -304,7 +264,8 @@ fn main() -> Result<(), AppError> {
 
     // To stop the bot after some time (example)
     // For testing, let the bot run for a defined duration, e.g., 20 seconds
-    info!("Main thread: Bot is running. Will attempt to stop in 20 seconds.");
+    // Reduced for quicker testing if digit recognition is slow or fails often.
+    info!("Main thread: Bot is running. Will attempt to stop in 20 seconds (or less if digit recognition fails).");
     thread::sleep(Duration::from_secs(20)); 
     if game_context.check_is_running() {
         info!("Main thread: Time's up, attempting to stop all loops by setting is_running to false.");
@@ -314,14 +275,13 @@ fn main() -> Result<(), AppError> {
     // Join all threads
     let mut all_threads_joined_successfully = true;
 
-    if let Some(pm_handle) = player_monitor_handle { // player_monitor_handle might not be initialized if setup fails
-       match pm_handle.join() {
-           Ok(_) => info!("PlayerMonitor thread joined successfully."),
-           Err(e) => {
-               error!("PlayerMonitor thread panicked: {:?}", e);
-               all_threads_joined_successfully = false;
-           }
-       }
+    // player_monitor_handle is guaranteed to be Some now if initialization up to that point succeeded.
+    match player_monitor_handle.join() {
+        Ok(_) => info!("PlayerMonitor thread joined successfully."),
+        Err(e) => {
+            error!("PlayerMonitor thread panicked: {:?}", e);
+            all_threads_joined_successfully = false;
+        }
     }
     match healer_handle.join() {
        Ok(_) => info!("Healer thread joined successfully."),

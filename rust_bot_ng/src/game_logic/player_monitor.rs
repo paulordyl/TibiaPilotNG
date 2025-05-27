@@ -5,6 +5,20 @@ use crate::{
 use log::{debug, info, error}; // Added error
 use std::{sync::Arc, thread, time::Duration};
 
+use crate::{
+    game_logic::{cavebot::core::AllDependencies, context::GameContext},
+    image_processing, // For digit_recognition
+    screen_capture,   // For capture_screen_region
+    AppError,
+};
+use log::{debug, info, error, warn}; // Added warn
+use std::{sync::Arc, thread, time::Duration};
+
+// Add a new error variant to AppError for recognition failures if it's not already there.
+// This would typically be in your main error enum definition (e.g., in main.rs or a dedicated errors.rs)
+// For this example, let's assume AppError has a variant like:
+// RecognitionFailed(String),
+
 pub struct PlayerMonitor {
     game_context: Arc<GameContext>,
 }
@@ -15,38 +29,95 @@ impl PlayerMonitor {
         PlayerMonitor { game_context }
     }
 
-    /// Simulates reading HP from the screen.
-    /// TODO: Implement actual screen capture and OCR/image analysis of the HP bar/value.
-    pub fn read_hp_from_screen(&self) -> Result<u32, AppError> {
-        info!("Simulating reading HP from screen.");
-        // Placeholder: In a real implementation, this would involve:
-        // 1. Defining screen region for HP.
-        // 2. Capturing that region using screen_capture module.
-        // 3. Processing the captured image (e.g., OCR or color analysis) to get HP value.
-        //    This might use functions from image_processing or a dedicated OCR module.
-        //    Dependencies for this (like TemplateManager for OCR fonts, or specific screen regions)
-        //    might need to be available, possibly via AllDependencies or a config struct.
-        Ok(80) // Return a fixed value for now
+    /// Reads HP from the screen using configured region and digit recognition.
+    pub fn read_hp_from_screen(&self, deps: &AllDependencies) -> Result<u32, AppError> {
+        info!("Attempting to read HP from screen.");
+        let hp_region_config = &deps.config.player_status_regions.hp;
+        debug!(
+            "HP region from config: x={}, y={}, w={}, h={}",
+            hp_region_config.x, hp_region_config.y, hp_region_config.width, hp_region_config.height
+        );
+
+        let captured_image = screen_capture::capture::capture_screen_region(
+            hp_region_config.x,
+            hp_region_config.y,
+            hp_region_config.width,
+            hp_region_config.height,
+        )
+        .map_err(|e| {
+            error!("Failed to capture HP screen region: {}", e);
+            e
+        })?;
+        info!("HP region captured successfully.");
+
+        match image_processing::digit_recognition::recognize_digits_in_region(
+            &captured_image,
+            &deps.template_manager,
+            "digit_", // Assuming "digit_" is the prefix for your digit templates
+        ) {
+            Ok(Some(hp_value)) => {
+                info!("HP recognized from screen: {}", hp_value);
+                Ok(hp_value)
+            }
+            Ok(None) => {
+                warn!("HP not recognized from screen region.");
+                Err(AppError::ImageProcessingError("HP not recognized".to_string())) // Using existing variant, or add RecognitionFailed
+            }
+            Err(e) => {
+                error!("Error during HP digit recognition: {}", e);
+                Err(e)
+            }
+        }
     }
 
-    /// Simulates reading MP from the screen.
-    /// TODO: Implement actual screen capture and OCR/image analysis of the MP bar/value.
-    pub fn read_mp_from_screen(&self) -> Result<u32, AppError> {
-        info!("Simulating reading MP from screen.");
-        // Placeholder: Similar to read_hp_from_screen, this needs real implementation.
-        // 1. Define screen region for MP.
-        // 2. Capture region.
-        // 3. Process image to get MP value.
-        Ok(150) // Return a fixed value for now
+    /// Reads MP from the screen using configured region and digit recognition.
+    pub fn read_mp_from_screen(&self, deps: &AllDependencies) -> Result<u32, AppError> {
+        info!("Attempting to read MP from screen.");
+        let mp_region_config = &deps.config.player_status_regions.mp;
+        debug!(
+            "MP region from config: x={}, y={}, w={}, h={}",
+            mp_region_config.x, mp_region_config.y, mp_region_config.width, mp_region_config.height
+        );
+
+        let captured_image = screen_capture::capture::capture_screen_region(
+            mp_region_config.x,
+            mp_region_config.y,
+            mp_region_config.width,
+            mp_region_config.height,
+        )
+        .map_err(|e| {
+            error!("Failed to capture MP screen region: {}", e);
+            e
+        })?;
+        info!("MP region captured successfully.");
+
+        match image_processing::digit_recognition::recognize_digits_in_region(
+            &captured_image,
+            &deps.template_manager,
+            "digit_", // Assuming "digit_" is the prefix for your digit templates
+        ) {
+            Ok(Some(mp_value)) => {
+                info!("MP recognized from screen: {}", mp_value);
+                Ok(mp_value)
+            }
+            Ok(None) => {
+                warn!("MP not recognized from screen region.");
+                Err(AppError::ImageProcessingError("MP not recognized".to_string())) // Using existing variant, or add RecognitionFailed
+            }
+            Err(e) => {
+                error!("Error during MP digit recognition: {}", e);
+                Err(e)
+            }
+        }
     }
 
     /// Main loop for monitoring player stats.
-    pub fn run_monitoring_loop(&self, _deps: &AllDependencies) { // deps is unused for now, but signature is consistent
+    pub fn run_monitoring_loop(&self, deps: &AllDependencies) { // deps is now used
         info!("Player monitoring loop started.");
         while self.game_context.check_is_running() {
-            match self.read_hp_from_screen() {
+            match self.read_hp_from_screen(deps) { // Pass deps
                 Ok(hp) => {
-                    match self.read_mp_from_screen() {
+                    match self.read_mp_from_screen(deps) { // Pass deps
                         Ok(mp) => {
                             // Acquire lock and update player_stats
                             match self.game_context.player_stats.lock() {
