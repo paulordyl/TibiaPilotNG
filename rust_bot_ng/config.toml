@@ -1,0 +1,24 @@
+[general]
+character_name = "RustBotUser"
+auto_login = false
+
+[arduino]
+port = "/dev/ttyUSB0" # or "COM3" for Windows
+baud_rate = 115200
+
+[hotkeys]
+heal = "f1"
+attack_spell = "f2"
+
+[player_status_regions]
+  [player_status_regions.hp]
+  x = 100
+  y = 50
+  width = 70
+  height = 10
+
+  [player_status_regions.mp]
+  x = 100
+  y = 65
+  width = 70
+  height = 10
