@@ -184,11 +184,44 @@ fn main() -> Result<(), AppError> {
     let mut cavebot = Cavebot::new(Arc::clone(&game_context));
 
     // Add some dummy waypoints for testing
-    // cavebot.add_waypoint(Waypoint::new("Start".to_string(), WaypointType::Walk, (100, 200, 7)));
-    // cavebot.add_waypoint(Waypoint::new("Open a Door".to_string(), WaypointType::OpenDoor, (110, 200, 7))); // Test OpenDoor
-    // cavebot.add_waypoint(Waypoint::new("Use Ladder".to_string(), WaypointType::Use, (105, 200, 7)));
-    // cavebot.add_waypoint(Waypoint::new("Go to monsters".to_string(), WaypointType::Walk, (150, 250, 6)));
-    // info!("Cavebot initialized with {} waypoints.", cavebot.waypoints_count());
+    cavebot.add_waypoint(Waypoint::new("Start".to_string(), WaypointType::Walk, (100, 200, 7)));
+    cavebot.add_waypoint(Waypoint::new("Open a Door".to_string(), WaypointType::OpenDoor, (110, 200, 7)));
+    
+    // Example for Wait WaypointType
+    cavebot.add_waypoint(Waypoint {
+        label: "Short Pause".to_string(),
+        waypoint_type: WaypointType::Wait { duration_ms: 2000 }, // Wait for 2 seconds
+        coordinate: (0,0,0), // Coordinate might be irrelevant for Wait, use a placeholder
+        duration_ms: Some(2000), // Also set the optional field for consistency
+        message: None,
+        hotkey: None,
+    });
+
+    // Example for Say WaypointType
+    cavebot.add_waypoint(Waypoint {
+        label: "Greeting".to_string(),
+        waypoint_type: WaypointType::Say { message: "Hello from RustBot-NG!".to_string() },
+        coordinate: (0,0,0), // Coordinate irrelevant
+        duration_ms: None,
+        message: Some("Hello from RustBot-NG!".to_string()), // Optional field
+        hotkey: None,
+    });
+
+    // Example for UseSelfItem WaypointType
+    // Assumes "f2" is configured for a mana potion or similar self-use item in config.hotkeys if used elsewhere
+    // For this WaypointType, the hotkey comes directly from the WaypointType variant.
+    cavebot.add_waypoint(Waypoint {
+        label: "Use Mana Potion".to_string(),
+        waypoint_type: WaypointType::UseSelfItem { hotkey: "f2".to_string() }, // Example: "f2"
+        coordinate: (0,0,0), // Coordinate irrelevant
+        duration_ms: None,
+        message: None,
+        hotkey: Some("f2".to_string()), // Optional field for general reference, primary data in WaypointType
+    });
+
+    cavebot.add_waypoint(Waypoint::new("Use Ladder".to_string(), WaypointType::Use, (105, 200, 7))); // This will currently log "not implemented"
+    cavebot.add_waypoint(Waypoint::new("Go to monsters".to_string(), WaypointType::Walk, (150, 250, 6)));
+    info!("Cavebot initialized with {} waypoints.", cavebot.waypoints_count());
 
     // Initialize Arc for config to share with AllDependencies
     let config_arc = Arc::new(config);

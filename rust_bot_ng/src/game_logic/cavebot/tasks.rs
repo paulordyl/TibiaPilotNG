@@ -7,10 +7,15 @@ use log::{debug, info, error}; // Added error
 
 use crate::image_processing; // Added for matching::find_template_on_screen
 
+use std::time::Duration; // Added for std::time::Duration
+
 #[derive(Debug)] // For logging the task
 pub enum CavebotTask {
     Walk { coordinate: (i32, i32, i32) },
     OpenDoor { coordinate: (i32, i32, i32), door_template_name: String },
+    Wait { duration: Duration },
+    Say { message: String },
+    UseSelfItem { hotkey: String }, // Added UseSelfItem task variant
     // TODO: Add other tasks like UseItem, TargetMonster, Say, etc.
 }
 
@@ -96,6 +101,47 @@ impl CavebotTask {
                     }
                 }
                 Ok(())
+            }
+            CavebotTask::Wait { duration } => {
+                info!("Executing WaitTask for {:?}", duration);
+                std::thread::sleep(*duration);
+                debug!("WaitTask finished.");
+                Ok(())
+            }
+            CavebotTask::Say { message } => {
+                info!("Executing SayTask: '{}'", message);
+                match deps.arduino_com.lock() {
+                    Ok(mut arduino_guard) => {
+                        input::keyboard::write(&mut *arduino_guard, message)?;
+                        debug!("SayTask: keyboard::write called successfully for message: '{}'", message);
+                        Ok(())
+                    }
+                    Err(poisoned_error) => {
+                        error!("Failed to acquire lock on ArduinoCom for SayTask: Mutex is poisoned. {}", poisoned_error);
+                        Err(AppError::InputError(format!(
+                            "Failed to acquire lock on ArduinoCom for SayTask (message: '{}'): Mutex is poisoned. {}",
+                            message, poisoned_error
+                        )))
+                    }
+                }
+            }
+            CavebotTask::UseSelfItem { hotkey } => {
+                info!("Executing UseSelfItemTask with hotkey: '{}'", hotkey);
+                match deps.arduino_com.lock() {
+                    Ok(mut arduino_guard) => {
+                        // keyboard::press expects a slice of string slices
+                        input::keyboard::press(&mut *arduino_guard, &[hotkey.as_str()])?;
+                        debug!("UseSelfItemTask: keyboard::press called successfully for hotkey: '{}'", hotkey);
+                        Ok(())
+                    }
+                    Err(poisoned_error) => {
+                        error!("Failed to acquire lock on ArduinoCom for UseSelfItemTask: Mutex is poisoned. {}", poisoned_error);
+                        Err(AppError::InputError(format!(
+                            "Failed to acquire lock on ArduinoCom for UseSelfItemTask (hotkey: '{}'): Mutex is poisoned. {}",
+                            hotkey, poisoned_error
+                        )))
+                    }
+                }
             } // TODO: Implement execute for other task variants here
         }
     }
