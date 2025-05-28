@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>XET-SpecterHID UI</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <h1>XET-SpecterHID WASM Interaction</h1>
+
+    <section>
+        <h2>Greet Function</h2>
+        <label for="nameInput">Name:</label>
+        <input type="text" id="nameInput" value="WASM User">
+        <button id="greetButton">Greet</button>
+        <p>Result: <span id="greetResult"></span></p>
+    </section>
+
+    <section>
+        <h2>Add Function</h2>
+        <label for="numA">Number A:</label>
+        <input type="number" id="numA" value="5">
+        <label for="numB">Number B:</label>
+        <input type="number" id="numB" value="7">
+        <button id="addButton">Add</button>
+        <p>Result: <span id="addResult"></span></p>
+    </section>
+
+    <section>
+        <h2>WebSocket Communication</h2>
+        <div>
+            <button id="wsConnectButton">Connect WebSocket</button>
+            <button id="wsDisconnectButton" disabled>Disconnect WebSocket</button>
+        </div>
+        <div>
+            <label for="wsMessageInput">Message:</label>
+            <input type="text" id="wsMessageInput" placeholder="Type message to send..." disabled>
+            <button id="wsSendButton" disabled>Send Message</button>
+        </div>
+        <div>
+            <button id="getSettingsButton" disabled>Get Server Settings</button>
+        </div>
+        <h3>WebSocket Log:</h3>
+        <pre id="wsLogOutput" style="height: 200px; overflow-y: scroll; border: 1px solid #ccc; background-color: #eee; padding: 10px;"></pre>
+    </section>
+
+    <footer>
+        <p>General Status: <span id="statusMessages"></span></p>
+    </footer>
+
+    <!-- Ensure this path is correct for your setup -->
+    <script type="module" src="dist/main.js"></script>
+</body>
+</html>

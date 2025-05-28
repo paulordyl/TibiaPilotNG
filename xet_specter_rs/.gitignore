@@ -1,0 +1,9 @@
+# Ignore Rust build artifacts and cache
+/target/
+
+# Ignore other common files
+.DS_Store
+*.log
+Cargo.lock # Usually committed, but for this tool environment, might be better to ignore if it causes issues with "too many files"
+# However, for now, I will only ignore /target/ as it's the primary cause of the "too many files" error.
+# If Cargo.lock becomes an issue, I can add it here later.

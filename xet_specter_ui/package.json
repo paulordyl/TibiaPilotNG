@@ -1,0 +1,13 @@
+{
+  "name": "xet_specter_ui",
+  "version": "0.1.0",
+  "description": "Frontend for XET-SpecterHID",
+  "main": "dist/main.js",
+  "scripts": {
+    "build": "tsc",
+    "start:dev": "tsc --watch"
+  },
+  "devDependencies": {
+    "typescript": "^5.4.0"
+  }
+}
