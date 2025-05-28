@@ -137,10 +137,10 @@ fn main() -> Result<(), AppError> {
     // Initialize TemplateManager and load templates
     // TemplateManager::load_templates_from_directory will recursively load from subdirectories like "templates/digits/"
     let mut template_manager = TemplateManager::new();
-    match template_manager.load_templates_from_directory("rust_bot_ng/templates") {
-        Ok(_) => info!("Templates loaded successfully from rust_bot_ng/templates/ (including subdirectories like digits/ if present)."),
+    match template_manager.load_templates_from_directory("templates") { // Changed path to relative
+        Ok(_) => info!("Templates loaded successfully from templates/ (including subdirectories like digits/ if present)."),
         Err(e) => {
-            error!("Failed to load templates from rust_bot_ng/templates/: {}. Proceeding with empty TemplateManager.", e);
+            error!("Failed to load templates from templates/: {}. Proceeding with empty TemplateManager.", e);
             // This might be acceptable if templates are optional or only for specific features.
         }
     }

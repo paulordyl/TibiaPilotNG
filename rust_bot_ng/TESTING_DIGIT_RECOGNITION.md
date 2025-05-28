@@ -2,7 +2,7 @@
 
 ## Objective
 
-This document outlines the process and requirements for testing the image-based digit recognition functionality (`recognize_digits_in_region`) in the `rust_bot_ng` project. Accurate digit recognition is crucial for features like reading HP, MP, quantities, etc., from the game screen.
+This document outlines the process and requirements for testing the image-based digit recognition functionality (`recognize_digits_in_region`) in the `SKB` project. Accurate digit recognition is crucial for features like reading HP, MP, quantities, etc., from the game screen.
 
 ## Required Test Assets
 
