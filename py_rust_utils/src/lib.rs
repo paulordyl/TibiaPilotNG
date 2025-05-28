@@ -19,7 +19,7 @@ fn release_keys(_py: Python, last_pressed_key: Option<String>) -> PyResult<Optio
     Ok(None)
 }
 
-// --- New Helper Functions ---
+// --- Helper Functions (existing) ---
 fn extract_and_process_region(
     screenshot_view: &ArrayView<u8, Ix2>, 
     region_x: usize, region_y: usize, region_width: usize, region_height: usize,
@@ -100,7 +100,7 @@ fn get_hashed_value(
     }
 }
 
-// --- New FFI Functions ---
+// --- Skill FFI Functions (existing) ---
 #[pyfunction]
 #[pyo3(signature = (screenshot, skills_icon_bbox, numbers_hashes))]
 fn get_hp_rust(
@@ -108,20 +108,15 @@ fn get_hp_rust(
     skills_icon_bbox: Option<(i32, i32, i32, i32)>, 
     numbers_hashes: HashMap<i64, i32>,
 ) -> PyResult<Option<i32>> {
-    if skills_icon_bbox.is_none() {
-        return Ok(None);
-    }
+    if skills_icon_bbox.is_none() { return Ok(None); }
     let bbox = skills_icon_bbox.unwrap();
     let icon_x = bbox.0;
     let icon_y = bbox.1;
-
     let base_x = icon_x + 6;
     let base_y = icon_y + 90;
     let screenshot_view = screenshot.as_array(); 
-
     let hundreds_val = get_hashed_value(&screenshot_view, base_x, base_y, 122, 22, 8, &numbers_hashes, true);
     let thousands_val = get_hashed_value(&screenshot_view, base_x, base_y, 94, 22, 8, &numbers_hashes, true);
-    
     Ok(Some((thousands_val * 1000) + hundreds_val))
 }
 
@@ -209,6 +204,103 @@ fn get_stamina_rust(
     let hours_val = get_hashed_value(&screenshot_view, base_x, base_y, 110, 14, 8, &minutes_or_hours_hashes, false);
     Ok(Some((hours_val * 60) + minutes_val))
 }
+
+// --- ActionBar FFI Functions ---
+#[pyfunction]
+fn check_specific_cooldown_rust(
+    cooldowns_image: PyReadonlyArray2<u8>, 
+    area_key: String,
+    cooldown_hashes: HashMap<i64, String>,
+) -> PyResult<bool> {
+    let view = cooldowns_image.as_array();
+    let (y_start, y_end, x_start, x_end) = match area_key.as_str() {
+        "attack" => (0, 20, 4, 24),
+        "healing" => (0, 20, 29, 49),
+        "support" => (0, 20, 54, 74),
+        _ => return Ok(false), 
+    };
+
+    if y_end > view.shape()[0] || x_end > view.shape()[1] {
+        return Ok(false); 
+    }
+    
+    let mut region_data = Vec::with_capacity((y_end - y_start) * (x_end - x_start));
+    for r in y_start..y_end {
+        for c in x_start..x_end {
+            region_data.push(view[(r,c)]);
+        }
+    }
+
+    let hash = hashit_rust(&region_data);
+
+    if let Some(hash_area_key_from_map) = cooldown_hashes.get(&hash) {
+        if *hash_area_key_from_map == area_key {
+            return Ok(true);
+        }
+    }
+    Ok(false)
+}
+
+#[pyfunction]
+fn is_action_bar_slot_equipped_rust(
+    screenshot: PyReadonlyArray2<u8>,
+    left_arrows_x: i32,
+    left_arrows_y: i32,
+    left_arrows_width: i32,
+    slot: u32, 
+) -> PyResult<bool> {
+    if slot == 0 { return Ok(false); } 
+    let slot_i32 = slot as i32;
+    let x0 = left_arrows_x + left_arrows_width + (slot_i32 * 2) + ((slot_i32 - 1) * 34);
+    let y = left_arrows_y;
+
+    let view = screenshot.as_array();
+    
+    if y < 0 || x0 < 0 { return Ok(false); }
+    let y_usize = y as usize;
+    let x_usize = x0 as usize;
+
+    if y_usize >= view.shape()[0] || x_usize >= view.shape()[1] {
+        return Ok(false); 
+    }
+    
+    Ok(view[(y_usize, x_usize)] == 41)
+}
+
+#[pyfunction]
+fn is_action_bar_slot_available_rust(
+    screenshot: PyReadonlyArray2<u8>,
+    left_arrows_x: i32,
+    left_arrows_y: i32,
+    left_arrows_width: i32,
+    slot: u32, 
+) -> PyResult<bool> {
+    if slot == 0 { return Ok(true); } 
+    let slot_i32 = slot as i32;
+    let x0 = left_arrows_x + left_arrows_width + (slot_i32 * 2) + ((slot_i32 - 1) * 34);
+    let check_y = left_arrows_y + 1;
+
+    if check_y < 0 || x0 < 0 { return Ok(true); } 
+    let check_y_usize = check_y as usize;
+
+    let view = screenshot.as_array();
+    let check_x_coords = [x0 + 2, x0 + 4, x0 + 6, x0 + 8, x0 + 10];
+
+    for check_x_offset in check_x_coords.iter() {
+        let check_x = *check_x_offset;
+        if check_x < 0 { return Ok(true); } 
+        
+        let check_x_usize = check_x as usize;
+
+        if check_y_usize >= view.shape()[0] || check_x_usize >= view.shape()[1] {
+            return Ok(true); 
+        }
+        if view[(check_y_usize, check_x_usize)] != 54 {
+            return Ok(true); 
+        }
+    }
+    Ok(false) 
+}
    
 // --- Updated PyModule ---
 #[pymodule]
@@ -222,6 +314,10 @@ fn rust_utils_module(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(get_speed_rust, m)?)?;
     m.add_function(wrap_pyfunction!(get_food_rust, m)?)?;
     m.add_function(wrap_pyfunction!(get_stamina_rust, m)?)?;
+    
+    m.add_function(wrap_pyfunction!(check_specific_cooldown_rust, m)?)?;
+    m.add_function(wrap_pyfunction!(is_action_bar_slot_equipped_rust, m)?)?;
+    m.add_function(wrap_pyfunction!(is_action_bar_slot_available_rust, m)?)?;
     Ok(())
 }
 
@@ -229,7 +325,7 @@ fn rust_utils_module(_py: Python, m: &PyModule) -> PyResult<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use numpy::{PyArray, PyArrayMethods}; // Added PyArrayMethods
+    use numpy::{PyArray, PyArrayMethods}; 
     use numpy::ndarray::Array; 
 
     fn get_reference_hash(data: &[u8]) -> i64 {
@@ -238,7 +334,6 @@ mod tests {
         hasher.finish() as i64
     }
 
-    // Corrected signature and usage for create_mock_screenshot_array
     fn create_mock_screenshot_array<'a>(py: Python<'a>, data: &'a [u8], rows: usize, cols: usize) -> PyReadonlyArray2<'a, u8> {
         PyArray::from_slice_bound(py, data) 
             .reshape((rows, cols)).unwrap()
@@ -381,4 +476,133 @@ mod tests {
     #[test] fn test_coordinates_are_equal_all_different() { assert!(!coordinates_are_equal((0, 0, 0), (1, 2, 3))); }
     #[test] fn test_release_keys_with_some_key() { Python::with_gil(|py| { let result = release_keys(py, Some("test_key".to_string())); assert!(result.is_ok()); assert_eq!(result.unwrap(), None); }); }
     #[test] fn test_release_keys_with_none_key() { Python::with_gil(|py| { let result = release_keys(py, None); assert!(result.is_ok()); assert_eq!(result.unwrap(), None); }); }
+
+    // --- New ActionBar Tests ---
+    #[test]
+    fn test_check_specific_cooldown_rust_scenarios() {
+        Python::with_gil(|py| {
+            let cooldown_img_width = 78;
+            let cooldown_img_height = 20;
+            
+            let mut cooldown_hashes = HashMap::new();
+            let attack_data_raw = vec![1u8; 20 * 20]; 
+            let attack_hash = get_reference_hash(&attack_data_raw);
+            cooldown_hashes.insert(attack_hash, "attack".to_string());
+
+            let healing_data_raw = vec![2u8; 20 * 20];
+            let healing_hash = get_reference_hash(&healing_data_raw);
+            cooldown_hashes.insert(healing_hash, "healing".to_string());
+
+            let support_data_raw = vec![3u8; 20 * 20];
+            let support_hash = get_reference_hash(&support_data_raw);
+            cooldown_hashes.insert(support_hash, "support".to_string());
+
+            // 1. Matching "attack" cooldown
+            let mut current_img_data_vec = vec![0u8; cooldown_img_width * cooldown_img_height];
+            for r in 0..20 { for c in 4..24 { current_img_data_vec[r * cooldown_img_width + c] = 1; } }
+            let cooldowns_image_s1 = create_mock_screenshot_array(py, &current_img_data_vec, cooldown_img_height, cooldown_img_width);
+            assert!(check_specific_cooldown_rust(cooldowns_image_s1, "attack".to_string(), cooldown_hashes.clone()).unwrap());
+
+            // 2. Matching "healing" cooldown
+            current_img_data_vec = vec![0u8; cooldown_img_width * cooldown_img_height]; 
+            for r in 0..20 { for c in 29..49 { current_img_data_vec[r * cooldown_img_width + c] = 2; } }
+            let cooldowns_image_s2 = create_mock_screenshot_array(py, &current_img_data_vec, cooldown_img_height, cooldown_img_width);
+            assert!(check_specific_cooldown_rust(cooldowns_image_s2, "healing".to_string(), cooldown_hashes.clone()).unwrap());
+            
+            // 3. Matching "support" cooldown
+            current_img_data_vec = vec![0u8; cooldown_img_width * cooldown_img_height]; 
+            for r in 0..20 { for c in 54..74 { current_img_data_vec[r * cooldown_img_width + c] = 3; } }
+            let cooldowns_image_s3 = create_mock_screenshot_array(py, &current_img_data_vec, cooldown_img_height, cooldown_img_width);
+            assert!(check_specific_cooldown_rust(cooldowns_image_s3, "support".to_string(), cooldown_hashes.clone()).unwrap());
+
+            // 4. Hash found, but area_key string does not match
+            let mut mismatched_hashes = HashMap::new();
+            mismatched_hashes.insert(attack_hash, "healing".to_string()); 
+            current_img_data_vec = vec![0u8; cooldown_img_width * cooldown_img_height]; 
+            for r in 0..20 { for c in 4..24 { current_img_data_vec[r * cooldown_img_width + c] = 1; } } 
+            let cooldowns_image_s4 = create_mock_screenshot_array(py, &current_img_data_vec, cooldown_img_height, cooldown_img_width);
+            assert!(!check_specific_cooldown_rust(cooldowns_image_s4, "attack".to_string(), mismatched_hashes).unwrap());
+            
+            // 5. Hash not found in the map
+            let empty_hashes = HashMap::new(); 
+            // Re-use current_img_data_vec which contains data for "attack"
+            let cooldowns_image_s5 = create_mock_screenshot_array(py, &current_img_data_vec, cooldown_img_height, cooldown_img_width);
+            assert!(!check_specific_cooldown_rust(cooldowns_image_s5, "attack".to_string(), empty_hashes).unwrap());
+
+            // 6. Unknown area_key string provided
+            let cooldowns_image_s6 = create_mock_screenshot_array(py, &current_img_data_vec, cooldown_img_height, cooldown_img_width);
+            assert!(!check_specific_cooldown_rust(cooldowns_image_s6, "unknown_key".to_string(), cooldown_hashes.clone()).unwrap());
+
+            // 7. Cooldowns_image is too small
+            let small_image_data = vec![0u8; 10 * 10];
+            let small_cooldowns_image = create_mock_screenshot_array(py, &small_image_data, 10, 10);
+            assert!(!check_specific_cooldown_rust(small_cooldowns_image, "attack".to_string(), cooldown_hashes).unwrap());
+        });
+    }
+
+    #[test]
+    fn test_is_action_bar_slot_equipped_rust_scenarios() {
+        Python::with_gil(|py| {
+            let mut screenshot_data_vec = vec![0u8; 100 * 100];
+            let (rows, cols) = (100, 100);
+            let (lx, ly, lw) = (10, 10, 5);
+            
+            // Scenario 1: Pixel value is 41 (equipped)
+            let slot_eq = 1_u32;
+            let x0_eq = lx + lw + (slot_eq as i32 * 2) + ((slot_eq as i32 - 1) * 34);
+            screenshot_data_vec[ly as usize * cols + x0_eq as usize] = 41;
+            let screenshot_s1 = create_mock_screenshot_array(py, &screenshot_data_vec, rows, cols);
+            assert!(is_action_bar_slot_equipped_rust(screenshot_s1, lx, ly, lw, slot_eq).unwrap());
+
+            // Scenario 2: Pixel value is not 41 (not equipped)
+            screenshot_data_vec[ly as usize * cols + x0_eq as usize] = 40; 
+            let screenshot_s2 = create_mock_screenshot_array(py, &screenshot_data_vec, rows, cols);
+            assert!(!is_action_bar_slot_equipped_rust(screenshot_s2, lx, ly, lw, slot_eq).unwrap());
+            screenshot_data_vec[ly as usize * cols + x0_eq as usize] = 0; 
+
+            // Scenario 3: Target pixel out of bounds
+            let screenshot_s3_data = vec![0u8; 100 * 100]; // Fresh data for these checks
+            assert!(!is_action_bar_slot_equipped_rust(create_mock_screenshot_array(py, &screenshot_s3_data, rows, cols), 90, 90, 5, 3).unwrap());
+            assert!(!is_action_bar_slot_equipped_rust(create_mock_screenshot_array(py, &screenshot_s3_data, rows, cols), -10, 10, 5, 1).unwrap()); 
+            assert!(!is_action_bar_slot_equipped_rust(create_mock_screenshot_array(py, &screenshot_s3_data, rows, cols), 10, -10, 5, 1).unwrap()); 
+
+            // Scenario 4: slot is 0
+            let screenshot_s4 = create_mock_screenshot_array(py, &screenshot_s3_data, rows, cols); // Can reuse s3_data
+            assert!(!is_action_bar_slot_equipped_rust(screenshot_s4, lx, ly, lw, 0).unwrap());
+        });
+    }
+
+    #[test]
+    fn test_is_action_bar_slot_available_rust_scenarios() {
+        Python::with_gil(|py| {
+            let mut screenshot_data_vec = vec![0u8; 100 * 100];
+            let (rows, cols) = (100, 100);
+            let (lx, ly, lw) = (10, 10, 5);
+
+            // Scenario 1: All five pixels are 54 (not available / on cooldown)
+            let slot_na = 1_u32;
+            let x0_na = lx + lw + (slot_na as i32 * 2) + ((slot_na as i32 - 1) * 34);
+            let check_y_na = (ly + 1) as usize;
+            for i in 0..5 {
+                screenshot_data_vec[check_y_na * cols + (x0_na + 2 + i*2) as usize] = 54;
+            }
+            let screenshot_s1 = create_mock_screenshot_array(py, &screenshot_data_vec, rows, cols);
+            assert!(!is_action_bar_slot_available_rust(screenshot_s1, lx, ly, lw, slot_na).unwrap());
+
+            // Scenario 2: At least one pixel is not 54 (available)
+            screenshot_data_vec[check_y_na * cols + (x0_na + 2) as usize] = 50; 
+            let screenshot_s2 = create_mock_screenshot_array(py, &screenshot_data_vec, rows, cols);
+            assert!(is_action_bar_slot_available_rust(screenshot_s2, lx, ly, lw, slot_na).unwrap());
+            for i in 0..5 { screenshot_data_vec[check_y_na * cols + (x0_na + 2 + i*2) as usize] = 0; }
+
+
+            // Scenario 3: One or more pixels out of bounds (available)
+            let screenshot_s3_data = vec![0u8; 100*100]; // Fresh data
+            assert!(is_action_bar_slot_available_rust(create_mock_screenshot_array(py, &screenshot_s3_data, rows, cols), 90, 90, 5, 3).unwrap()); 
+
+            // Scenario 4: slot is 0 (should be available as per logic)
+            let screenshot_s4 = create_mock_screenshot_array(py, &screenshot_s3_data, rows, cols);
+            assert!(is_action_bar_slot_available_rust(screenshot_s4, lx, ly, lw, 0).unwrap());
+        });
+    }
 }
