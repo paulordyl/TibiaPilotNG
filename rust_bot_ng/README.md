@@ -1,8 +1,8 @@
-# RustBot-NG: A Game Bot in Rust
+# SKB: A Game Bot in Rust
 
 ## Overview
 
-RustBot-NG is a project to rewrite a Python-based game bot in Rust. The primary goals are to achieve better performance, explore potentially stealthier interaction techniques, and build a modern, robust architecture that can be extended with more advanced features, including AI capabilities.
+SKB is a project to rewrite a Python-based game bot in Rust. The primary goals are to achieve better performance, explore potentially stealthier interaction techniques, and build a modern, robust architecture that can be extended with more advanced features, including AI capabilities.
 
 This bot interacts with games by reading screen information (visual perception) and emulating user input, primarily via an Arduino device for hardware-level input simulation.
 
@@ -70,7 +70,7 @@ The project is organized into several main modules:
     *   OpenCV development libraries.
     *   A C++ toolchain (required by the OpenCV crate).
     *   An Arduino device flashed with compatible firmware that understands the serial commands sent by this bot.
-2.  **Build**: Navigate to the `rust_bot_ng` project root and run `cargo build --release`.
+2.  **Build**: Navigate to the SKB project root and run `cargo build --release`.
 3.  **Configure**:
     *   Set up `config.toml` with your specific game settings, Arduino port, hotkeys, and screen regions.
     *   Place necessary image templates in the `templates/` directory, especially digit templates in `templates/digits/`.
