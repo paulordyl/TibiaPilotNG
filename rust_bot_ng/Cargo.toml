@@ -5,6 +5,14 @@ edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
+[lib]
+name = "rust_bot_ng_py_utils" # Name of the python module
+crate-type = ["cdylib"]
+
+[[bin]]
+name = "skb_bin" # Name of the binary executable
+path = "src/main.rs"
+
 [dependencies]
 thiserror = "1.0"
 log = "0.4"
@@ -12,7 +20,8 @@ env_logger = "0.9"
 serialport = "4.2"
 base64 = "0.13"
 screenshots = "0.5" # For screen capture
-image = "0.24"      # For image manipulation
-opencv = { version = "0.84", features = ["imgproc", "highgui"] } # For image processing, including necessary features
+image = "0.23.14"      # For image manipulation - Pinned to older version
+opencv = { version = "0.70.0", features = ["imgproc", "highgui"] } # For image processing, Pinned to older version
 serde = { version = "1.0", features = ["derive"] } # For serialization/deserialization
 toml = "0.8" # For TOML parsing
+pyo3 = { version = "0.21.0", features = ["extension-module"] }

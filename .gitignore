@@ -27,3 +27,7 @@ var/
 .idea/
 .vscode/
 venv
+
+# Rust build output
+rust_bot_ng/target/
+py_rust_utils/target/
