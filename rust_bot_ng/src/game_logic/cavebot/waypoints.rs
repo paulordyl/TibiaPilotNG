@@ -9,8 +9,9 @@ pub enum WaypointType {
     Refill,     // Trigger a refilling sequence (potions, arrows)
     Approach,   // Approach a creature or specific point
     Target,     // Select a target (monster)
-    Wait,       // Pause execution for a specified duration
-    Say,        // Say something in chat (e.g. for spells or interacting with NPCs)
+    Wait { duration_ms: u64 }, // Pause execution for a specified duration
+    Say { message: String },    // Say something in chat (e.g. for spells or interacting with NPCs)
+    UseSelfItem { hotkey: String }, // Use an item on oneself via hotkey (e.g., potion, spell)
     Script,     // Execute a sub-script or a sequence of actions
     Logout,     // Log out of the game
     // TODO: Add other types as identified from Python's waypoint.py or taskList, e.g., Attack, SpecialAttack, DropLoot
@@ -21,12 +22,13 @@ pub struct Waypoint {
     pub label: String,
     pub waypoint_type: WaypointType,
     pub coordinate: (i32, i32, i32), // (x, y, z) representing game coordinates
+    pub duration_ms: Option<u64>, // For Wait type if not directly in enum, or for general use
+    pub message: Option<String>,     // For Say type
+    pub hotkey: Option<String>,      // For potential future hotkey-related tasks
     // TODO: Add other potential fields like metadata/options for specific types.
     // For example:
     // pub item_id: Option<u32>, // For Use, Pick, DropLoot
     // pub target_name: Option<String>, // For Target, Approach
-    // pub duration_ms: Option<u64>, // For Wait
-    // pub message: Option<String>, // For Say
     // pub script_name: Option<String>, // For Script
 }
 
@@ -40,7 +42,9 @@ impl Waypoint {
             label,
             waypoint_type,
             coordinate,
-            // Initialize other fields to None or default values here
+            duration_ms: None,
+            message: None,
+            hotkey: None,
         }
     }
 }

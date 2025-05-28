@@ -122,6 +122,23 @@ impl Cavebot {
                     };
                     task.execute(deps)
                 }
+                WaypointType::Wait { duration_ms } => {
+                    info!("Creating WaitTask for {} ms", duration_ms);
+                    let task = tasks::CavebotTask::Wait {
+                        duration: std::time::Duration::from_millis(duration_ms),
+                    };
+                    task.execute(deps)
+                }
+                WaypointType::Say { message } => {
+                    info!("Creating SayTask with message: '{}'", message);
+                    let task = tasks::CavebotTask::Say { message: message.clone() };
+                    task.execute(deps)
+                }
+                WaypointType::UseSelfItem { hotkey } => {
+                    info!("Creating UseSelfItemTask with hotkey: '{}'", hotkey);
+                    let task = tasks::CavebotTask::UseSelfItem { hotkey: hotkey.clone() };
+                    task.execute(deps)
+                }
                 // Add other WaypointType cases here
                 _ => {
                     warn!("Task execution for waypoint type '{:?}' not implemented yet.", waypoint.waypoint_type);
