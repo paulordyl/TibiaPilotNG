@@ -1,0 +1,18 @@
+[obs]
+host = "localhost"
+port = 4455
+password = "your_obs_websocket_password" # Optional, if OBS WebSocket server requires authentication
+
+[capture]
+delay_ms = 100 # Delay between captures in milliseconds
+
+[vision]
+# Placeholder for vision-related settings, e.g., coordinates for regions of interest
+roi_x = 0
+roi_y = 0
+roi_width = 1920
+roi_height = 1080
+
+[input_emulator]
+min_delay_ms = 50  # Minimum delay for simulated input
+max_delay_ms = 150 # Maximum delay for simulated input
