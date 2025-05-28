@@ -1,5 +1,4 @@
 import dxcam
-from farmhash import FarmHash64
 import numpy as np
 from typing import Callable, Union, List # Added List
 from src.shared.typings import BBox, GrayImage
@@ -60,6 +59,13 @@ if hasattr(py_rust_lib, 'convert_bgra_to_grayscale_rust'):
 else:
     print("Warning: function 'convert_bgra_to_grayscale_rust' not found in py_rust_lib.")
 
+# farmhash_image_data_rust
+if hasattr(py_rust_lib, 'farmhash_image_data_rust'):
+    py_rust_lib.farmhash_image_data_rust.argtypes = [RustImageData] # Input is RustImageData by value
+    py_rust_lib.farmhash_image_data_rust.restype = ctypes.c_uint64
+else:
+    print("Warning: FFI function 'farmhash_image_data_rust' not found in py_rust_lib.")
+
 
 camera = dxcam.create(device_idx=0, output_idx=1, output_color='BGRA')
 latestScreenshot = None
@@ -93,7 +99,41 @@ def cacheObjectPosition(func: Callable) -> Callable:
 
 # TODO: add unit tests
 def hashit(arr: np.ndarray) -> int:
-    return FarmHash64(np.ascontiguousarray(arr))
+    # Ensure FFI function is available
+    if not hasattr(py_rust_lib, 'farmhash_image_data_rust'):
+        raise RuntimeError("Rust FFI function 'farmhash_image_data_rust' is not available.")
+    
+    # _numpy_to_rust_image_data must also be available from imports.
+    if _numpy_to_rust_image_data is None:
+        raise RuntimeError("Helper function '_numpy_to_rust_image_data' for Rust data conversion is not available.")
+
+    # 1. Convert NumPy array to RustImageData
+    # The format string "BYTES" is a placeholder; Rust side will use dimensions from RustImageData
+    # to calculate total length of bytes to hash from arr.data.
+    # The _numpy_to_rust_image_data function handles making the array C-contiguous if needed by its internal logic
+    # before getting the data pointer, or gets a pointer to existing C-contiguous data.
+    # The key is that RustImageData.data points to the start of the byte buffer.
+    
+    # Determine format based on ndim, similar to previous migrations, to correctly populate channels.
+    if arr.ndim == 2:
+        format_str = "GRAY" # Effectively 1 channel
+    elif arr.ndim == 3:
+        format_str = "RGB" # Or BGR, etc. Number of channels will be derived from shape.
+                           # For hashing, actual color format might not matter as much as byte sequence.
+    else:
+        # For a generic 1D array or other dimensionalities, we might need a different approach
+        # or assume "BYTES" and let Rust derive from total size if possible.
+        # However, hashit is primarily used with image slices (2D or 3D).
+        # Let's stick to what _numpy_to_rust_image_data supports well.
+        raise ValueError(f"Unsupported array ndim for hashit: {arr.ndim}")
+
+    rust_image_data = _numpy_to_rust_image_data(arr, format_str)
+    
+    # 2. Call the FFI function
+    hash_value = py_rust_lib.farmhash_image_data_rust(rust_image_data)
+    
+    # 3. Return the result (it's already a Python int compatible with uint64 from ctypes)
+    return hash_value
 
 
 # TODO: add unit tests
