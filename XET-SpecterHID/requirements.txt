@@ -1,0 +1,6 @@
+obs-websocket-py
+Pillow
+opencv-python
+numpy
+pyautogui
+toml
