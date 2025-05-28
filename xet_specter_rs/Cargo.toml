@@ -1,0 +1,8 @@
+[workspace]
+members = [
+    "frontend_logic",
+    "server",
+]
+
+# Optional: Define default resolver version for the workspace
+resolver = "2"

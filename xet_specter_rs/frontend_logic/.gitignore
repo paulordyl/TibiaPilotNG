@@ -1,0 +1,2 @@
+# Ignore wasm-pack build output
+/pkg/
