@@ -1,10 +1,12 @@
 import re
 import tkinter as tk
 import customtkinter
+from ...theme import MATRIX_BLACK, MATRIX_GREEN, MATRIX_GREEN_HOVER, MATRIX_GREEN_BORDER
 
 class ManaFoodCard(customtkinter.CTkFrame):
     def __init__(self, parent, context):
-        super().__init__(parent)
+        super().__init__(parent, fg_color=MATRIX_BLACK, border_color=MATRIX_GREEN_BORDER, border_width=1)
+        self.configure(fg_color=MATRIX_BLACK)
         self.context = context
         self.columnconfigure(0, weight=3)
         self.columnconfigure(1, weight=7)
@@ -13,48 +15,52 @@ class ManaFoodCard(customtkinter.CTkFrame):
         self.rowconfigure(2, weight=1)
         self.rowconfigure(3, weight=1)
 
-        self.manaFoodLabel = customtkinter.CTkLabel(self, text="Mana food")
-        self.manaFoodLabel.grid(row=0, column=0, sticky='w', padx=10, pady=(10, 0))
+        self.titleLabel = customtkinter.CTkLabel(self, text="Mana food", text_color=MATRIX_GREEN) # Renamed from manaFoodLabel
+        self.titleLabel.grid(row=0, column=0, columnspan=2, sticky='ew', padx=10, pady=(10, 5))
 
         self.checkVar = tk.BooleanVar()
         self.checkVar.set(
             self.context.context['healing']['highPriority']['manaFood']['enabled'])
         self.checkbutton = customtkinter.CTkCheckBox(
             self, text='Enabled', variable=self.checkVar, command=self.onToggleCheckButton,
-            hover_color="#870125", fg_color='#C20034')
-        self.checkbutton.grid(column=1, row=1, sticky='e', pady=10)
+            text_color=MATRIX_GREEN, fg_color=MATRIX_GREEN, hover_color=MATRIX_GREEN_HOVER,
+            border_color=MATRIX_GREEN_BORDER, checkmark_color=MATRIX_BLACK)
+        self.checkbutton.grid(column=1, row=1, sticky='e', padx=10, pady=5)
 
-        self.hotkeyLabel = customtkinter.CTkLabel(
-            self, text='Hotkey:')
-        self.hotkeyLabel.grid(column=0, row=2, padx=5,
-                            pady=5, sticky='nsew')
+        self.hotkeyDescLabel = customtkinter.CTkLabel( # Renamed from hotkeyLabel
+            self, text='Hotkey:', text_color=MATRIX_GREEN)
+        self.hotkeyDescLabel.grid(column=0, row=2, padx=10,
+                            pady=5, sticky='w')
 
         self.hotkeyEntryVar = tk.StringVar()
         self.hotkeyEntryVar.set(self.context.context['healing']
                                     ['highPriority']['manaFood']['hotkey'])
-        self.hotkeyEntry = customtkinter.CTkEntry(self, textvariable=self.hotkeyEntryVar)
+        self.hotkeyEntry = customtkinter.CTkEntry(self, textvariable=self.hotkeyEntryVar,
+                                                 text_color=MATRIX_GREEN, border_color=MATRIX_GREEN_BORDER,
+                                                 fg_color=MATRIX_BLACK, insertbackground=MATRIX_GREEN)
         self.hotkeyEntry.bind('<Key>', self.onChangeHotkey)
-        self.hotkeyEntry.grid(column=1, row=2, padx=5,
-                            pady=5, sticky='nsew')
+        self.hotkeyEntry.grid(column=1, row=2, padx=10,
+                            pady=5, sticky='ew')
 
-        self.manaPercentageLessThanOrEqualLabel = customtkinter.CTkLabel(
-            self, text='HP % less than or equal:')
-        self.manaPercentageLessThanOrEqualLabel.grid(
-            column=0, row=3, sticky='nsew', padx=(10, 0))
+        self.manaPercentageLessThanOrEqualDescLabel = customtkinter.CTkLabel( # Renamed for clarity
+            self, text='Mana % <=:', text_color=MATRIX_GREEN) # Shortened text, original said "HP %"
+        self.manaPercentageLessThanOrEqualDescLabel.grid(
+            column=0, row=3, sticky='w', padx=10, pady=5)
 
         self.manaPercentageLessThanOrEqualVar = tk.IntVar()
         self.manaPercentageLessThanOrEqualVar.set(
             self.context.context['healing']['highPriority']['manaFood']['manaPercentageLessThanOrEqual'])
         self.manaPercentageLessThanOrEqualSlider = customtkinter.CTkSlider(self, from_=10, to=100,
-                                                        button_color='#C20034', button_hover_color='#870125',
+                                                        button_color=MATRIX_GREEN_BORDER, button_hover_color=MATRIX_GREEN_HOVER,
+                                                        progress_color=MATRIX_GREEN, fg_color=MATRIX_GREEN_BORDER,
                                                         variable=self.manaPercentageLessThanOrEqualVar, command=self.onChangeMana)
         self.manaPercentageLessThanOrEqualSlider.grid(
-            column=1, row=3, sticky='ew', padx=10, pady=10)
+            column=1, row=3, sticky='ew', padx=10, pady=5)
         
-        self.manaPercentageLessThanOrEqualLabel = customtkinter.CTkLabel(
-            self, textvariable=self.manaPercentageLessThanOrEqualVar)
-        self.manaPercentageLessThanOrEqualLabel.grid(
-            column=1, row=4, sticky='nsew')
+        self.manaPercentageLessThanOrEqualValueLabel = customtkinter.CTkLabel( # Renamed for clarity
+            self, textvariable=self.manaPercentageLessThanOrEqualVar, text_color=MATRIX_GREEN)
+        self.manaPercentageLessThanOrEqualValueLabel.grid(
+            column=1, row=4, sticky='e', padx=10, pady=(0,5))
 
     def onToggleCheckButton(self):
         self.context.toggleHealingHighPriorityByKey(

@@ -3,11 +3,13 @@ from .manaFoodCard import ManaFoodCard
 from .swapAmuletCard import SwapAmuletCard
 from .swapRingCard import SwapRingCard
 import customtkinter
+from ...theme import MATRIX_BLACK # Only MATRIX_BLACK is needed here as cards handle their own styling
 
 
 class HighPriorityTab(customtkinter.CTkFrame):
     def __init__(self, parent, context):
-        super().__init__(parent)
+        super().__init__(parent, fg_color=MATRIX_BLACK)
+        self.configure(fg_color=MATRIX_BLACK) # Ensure the main frame bg is black
         self.context = context
         self.columnconfigure(0, weight=1)
         self.columnconfigure(1, weight=1)

@@ -2,10 +2,12 @@ import tkinter as tk
 import customtkinter
 import re
 from tkinter import messagebox
+from ...theme import MATRIX_BLACK, MATRIX_GREEN, MATRIX_GREEN_HOVER, MATRIX_GREEN_BORDER
 
 class SwapAmuletCard(customtkinter.CTkFrame):
     def __init__(self, parent, context):
-        super().__init__(parent)
+        super().__init__(parent, fg_color=MATRIX_BLACK, border_color=MATRIX_GREEN_BORDER, border_width=1)
+        self.configure(fg_color=MATRIX_BLACK)
         self.context = context
         self.columnconfigure(0, weight=3)
         self.columnconfigure(1, weight=7)
@@ -14,98 +16,101 @@ class SwapAmuletCard(customtkinter.CTkFrame):
         self.rowconfigure(2, weight=1)
         self.rowconfigure(3, weight=1)
 
-        self.healthFoodLabel = customtkinter.CTkLabel(self, text="Swap amulet")
-        self.healthFoodLabel.grid(row=0, column=0, sticky='w', padx=10, pady=(10, 0))
+        self.titleLabel = customtkinter.CTkLabel(self, text="Swap amulet", text_color=MATRIX_GREEN) # Renamed from healthFoodLabel
+        self.titleLabel.grid(row=0, column=0, columnspan=2, sticky='ew', padx=10, pady=(10, 5))
 
         self.checkVar = tk.BooleanVar()
         self.checkVar.set(
             self.context.context['healing']['highPriority']['swapAmulet']['enabled'])
         self.checkbutton = customtkinter.CTkCheckBox(
             self, text='Enabled', variable=self.checkVar, command=self.onToggleCheckButton,
-            hover_color="#870125", fg_color='#C20034')
-        self.checkbutton.grid(column=1, row=1, sticky='e')
+            text_color=MATRIX_GREEN, fg_color=MATRIX_GREEN, hover_color=MATRIX_GREEN_HOVER,
+            border_color=MATRIX_GREEN_BORDER, checkmark_color=MATRIX_BLACK)
+        self.checkbutton.grid(column=1, row=1, sticky='e', padx=10, pady=5)
 
-        self.tankHotkeyLabel = customtkinter.CTkLabel(
-            self, text='Tank Hotkey:')
-        self.tankHotkeyLabel.grid(column=0, row=2, padx=10,
-                            pady=10, sticky='nsew')
+        # --- Tank Amulet Section ---
+        self.tankAmuletSectionLabel = customtkinter.CTkLabel(self, text="Tank Amulet:", text_color=MATRIX_GREEN, font=("Arial", 12, "bold"))
+        self.tankAmuletSectionLabel.grid(row=2, column=0, columnspan=2, sticky='ew', padx=10, pady=(10,2))
+        
+        self.tankHotkeyDescLabel = customtkinter.CTkLabel(self, text='Hotkey:', text_color=MATRIX_GREEN) # Renamed
+        self.tankHotkeyDescLabel.grid(column=0, row=3, padx=10, pady=5, sticky='w')
 
         self.tankHotkeyEntryVar = tk.StringVar()
         self.tankHotkeyEntryVar.set(self.context.context['healing']['highPriority']['swapAmulet']['tankAmulet']['hotkey'])
-        self.tankHotkeyEntry = customtkinter.CTkEntry(self, textvariable=self.tankHotkeyEntryVar)
+        self.tankHotkeyEntry = customtkinter.CTkEntry(self, textvariable=self.tankHotkeyEntryVar,
+                                                     text_color=MATRIX_GREEN, border_color=MATRIX_GREEN_BORDER,
+                                                     fg_color=MATRIX_BLACK, insertbackground=MATRIX_GREEN)
         self.tankHotkeyEntry.bind('<Key>', self.onChangeTankHotkey)
-        self.tankHotkeyEntry.grid(column=1, row=2, padx=10,
-                            pady=10, sticky='nsew')
+        self.tankHotkeyEntry.grid(column=1, row=3, padx=10, pady=5, sticky='ew')
         
-        self.slotTankLabel = customtkinter.CTkLabel(
-            self, text='Tank Slot:')
-        self.slotTankLabel.grid(column=0, row=3, padx=10,
-                            pady=10, sticky='nsew')
+        self.slotTankDescLabel = customtkinter.CTkLabel(self, text='Slot:', text_color=MATRIX_GREEN) # Renamed
+        self.slotTankDescLabel.grid(column=0, row=4, padx=10, pady=5, sticky='w')
 
         self.slotTankEntryVar = tk.StringVar()
         self.slotTankEntryVar.set(self.context.context['healing']['highPriority']['swapAmulet']['tankAmulet']['slot'])
         self.slotTankEntry = customtkinter.CTkEntry(self, textvariable=self.slotTankEntryVar, validate='key',
-                                        validatecommand=(self.register(self.validateNumber), "%P"))
+                                        validatecommand=(self.register(self.validateNumber), "%P"),
+                                        text_color=MATRIX_GREEN, border_color=MATRIX_GREEN_BORDER,
+                                        fg_color=MATRIX_BLACK, insertbackground=MATRIX_GREEN)
         self.slotTankEntry.bind('<KeyRelease>', self.onChangeTankNumber)
-        self.slotTankEntry.grid(column=1, row=3, padx=10,
-                            pady=10, sticky='nsew')
+        self.slotTankEntry.grid(column=1, row=4, padx=10, pady=5, sticky='ew')
 
-        self.aaaLabel = customtkinter.CTkLabel(self, text='Tank - HP % less than or equal:')
-        self.aaaLabel.grid(column=0, row=4, sticky='nsew', padx=(10, 0))
+        self.tankHpDescLabel = customtkinter.CTkLabel(self, text='HP % <=:', text_color=MATRIX_GREEN) # Renamed from aaaLabel
+        self.tankHpDescLabel.grid(column=0, row=5, sticky='w', padx=10, pady=5)
 
         self.hpLessThanOrEqualVar = tk.IntVar()
         self.hpLessThanOrEqualVar.set(
             self.context.context['healing']['highPriority']['swapAmulet']['tankAmulet']['hpPercentageLessThanOrEqual'])
         self.hpLessThanOrEqualSlider = customtkinter.CTkSlider(self, from_=10, to=100,
-                                                button_color='#C20034', button_hover_color='#870125',
+                                                button_color=MATRIX_GREEN_BORDER, button_hover_color=MATRIX_GREEN_HOVER,
+                                                progress_color=MATRIX_GREEN, fg_color=MATRIX_GREEN_BORDER,
                                                 variable=self.hpLessThanOrEqualVar, command=self.onChangeHpLessThanOrEqual)
-        self.hpLessThanOrEqualSlider.grid(column=1, row=4, sticky='ew')
+        self.hpLessThanOrEqualSlider.grid(column=1, row=5, padx=10, pady=5, sticky='ew')
 
-        self.hpLessThanOrEqualLabel = customtkinter.CTkLabel(
-            self, textvariable=self.hpLessThanOrEqualVar)
-        self.hpLessThanOrEqualLabel.grid(
-            column=1, row=5, sticky='nsew')
+        self.hpLessThanOrEqualValueLabel = customtkinter.CTkLabel(self, textvariable=self.hpLessThanOrEqualVar, text_color=MATRIX_GREEN) # Renamed
+        self.hpLessThanOrEqualValueLabel.grid(column=1, row=6, sticky='e', padx=10, pady=(0,5))
         
-        self.mainHotkeyLabel = customtkinter.CTkLabel(
-            self, text='Main Hotkey:')
-        self.mainHotkeyLabel.grid(column=0, row=6, padx=10,
-                            pady=10, sticky='nsew')
+        # --- Main Amulet Section ---
+        self.mainAmuletSectionLabel = customtkinter.CTkLabel(self, text="Main Amulet:", text_color=MATRIX_GREEN, font=("Arial", 12, "bold"))
+        self.mainAmuletSectionLabel.grid(row=7, column=0, columnspan=2, sticky='ew', padx=10, pady=(10,2))
+
+        self.mainHotkeyDescLabel = customtkinter.CTkLabel(self, text='Hotkey:', text_color=MATRIX_GREEN) # Renamed
+        self.mainHotkeyDescLabel.grid(column=0, row=8, padx=10, pady=5, sticky='w')
 
         self.mainHotkeyEntryVar = tk.StringVar()
         self.mainHotkeyEntryVar.set(self.context.context['healing']['highPriority']['swapAmulet']['mainAmulet']['hotkey'])
-        self.mainHotkeyEntry = customtkinter.CTkEntry(self, textvariable=self.mainHotkeyEntryVar)
+        self.mainHotkeyEntry = customtkinter.CTkEntry(self, textvariable=self.mainHotkeyEntryVar,
+                                                     text_color=MATRIX_GREEN, border_color=MATRIX_GREEN_BORDER,
+                                                     fg_color=MATRIX_BLACK, insertbackground=MATRIX_GREEN)
         self.mainHotkeyEntry.bind('<Key>', self.onChangeMainHotkey)
-        self.mainHotkeyEntry.grid(column=1, row=6, padx=10,
-                            pady=10, sticky='nsew')
+        self.mainHotkeyEntry.grid(column=1, row=8, padx=10, pady=5, sticky='ew')
         
-        self.slotMainLabel = customtkinter.CTkLabel(
-            self, text='Main Slot:')
-        self.slotMainLabel.grid(column=0, row=7, padx=10,
-                            pady=10, sticky='nsew')
+        self.slotMainDescLabel = customtkinter.CTkLabel(self, text='Slot:', text_color=MATRIX_GREEN) # Renamed
+        self.slotMainDescLabel.grid(column=0, row=9, padx=10, pady=5, sticky='w')
 
         self.slotMainEntryVar = tk.StringVar()
         self.slotMainEntryVar.set(self.context.context['healing']['highPriority']['swapAmulet']['mainAmulet']['slot'])
         self.slotMainEntry = customtkinter.CTkEntry(self, textvariable=self.slotMainEntryVar, validate='key',
-                                        validatecommand=(self.register(self.validateNumber), "%P"))
+                                        validatecommand=(self.register(self.validateNumber), "%P"),
+                                        text_color=MATRIX_GREEN, border_color=MATRIX_GREEN_BORDER,
+                                        fg_color=MATRIX_BLACK, insertbackground=MATRIX_GREEN)
         self.slotMainEntry.bind('<KeyRelease>', self.onChangeMainNumber)
-        self.slotMainEntry.grid(column=1, row=7, padx=10,
-                            pady=10, sticky='nsew')
+        self.slotMainEntry.grid(column=1, row=9, padx=10, pady=5, sticky='ew')
 
-        self.bbbLabel = customtkinter.CTkLabel(self, text='Main - HP % greater than:')
-        self.bbbLabel.grid(column=0, row=8, sticky='nsew', padx=(10, 0))
+        self.mainHpDescLabel = customtkinter.CTkLabel(self, text='HP % >:', text_color=MATRIX_GREEN) # Renamed from bbbLabel
+        self.mainHpDescLabel.grid(column=0, row=10, sticky='w', padx=10, pady=5)
 
         self.hpGreaterThanVar = tk.IntVar()
         self.hpGreaterThanVar.set(
             self.context.context['healing']['highPriority']['swapAmulet']['mainAmulet']['hpPercentageGreaterThan'])
         self.hpGreaterThanSlider = customtkinter.CTkSlider(self, from_=10, to=100,
-                                            button_color='#C20034', button_hover_color='#870125',
+                                            button_color=MATRIX_GREEN_BORDER, button_hover_color=MATRIX_GREEN_HOVER,
+                                            progress_color=MATRIX_GREEN, fg_color=MATRIX_GREEN_BORDER,
                                             variable=self.hpGreaterThanVar, command=self.onChangeHpGreaterThan)
-        self.hpGreaterThanSlider.grid(column=1, row=8, sticky='ew')
+        self.hpGreaterThanSlider.grid(column=1, row=10, padx=10, pady=5, sticky='ew')
 
-        self.hpGreaterThanLabel = customtkinter.CTkLabel(
-            self, textvariable=self.hpGreaterThanVar)
-        self.hpGreaterThanLabel.grid(
-            column=1, row=9, sticky='nsew')
+        self.hpGreaterThanValueLabel = customtkinter.CTkLabel(self, textvariable=self.hpGreaterThanVar, text_color=MATRIX_GREEN) # Renamed
+        self.hpGreaterThanValueLabel.grid(column=1, row=11, sticky='e', padx=10, pady=(0,5))
 
     def onToggleCheckButton(self):
         self.context.toggleHealingHighPriorityByKey(

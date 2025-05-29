@@ -3,6 +3,7 @@ from tkinter import BooleanVar
 import queue
 import json # Though likely handled in client, good for future use
 from .websocket_client import SpecterWebSocketClient
+from .theme import MATRIX_BLACK, MATRIX_GREEN, MATRIX_GREEN_HOVER, MATRIX_GREEN_BORDER, MATRIX_GREEN_DISABLED
 from .pages.config import ConfigPage
 from .pages.comboSpells import ComboSpellsPage
 from .pages.inventory import InventoryPage
@@ -15,6 +16,7 @@ class Application(customtkinter.CTk):
         super().__init__()
         
         customtkinter.set_appearance_mode("dark")
+        self.configure(fg_color=MATRIX_BLACK)
 
         self.context = context
         self.title(genRanStr())
@@ -28,39 +30,44 @@ class Application(customtkinter.CTk):
         self.canvasWindow = None
 
         configurationBtn = customtkinter.CTkButton(self, text="Configuration", corner_radius=32,
-                                        fg_color="transparent", border_color="#C20034",
-                                        border_width=2, hover_color="#C20034",
+                                        fg_color="transparent", text_color=MATRIX_GREEN,
+                                        border_color=MATRIX_GREEN_BORDER, border_width=2,
+                                        hover_color=MATRIX_GREEN_HOVER,
                                         command=self.configurationWindow)
         configurationBtn.grid(row=0, column=0, padx=20, pady=20)
 
         inventoryBtn = customtkinter.CTkButton(self, text="Inventory", corner_radius=32,
-                                        fg_color="transparent", border_color="#C20034",
-                                        border_width=2, hover_color="#C20034",
+                                        fg_color="transparent", text_color=MATRIX_GREEN,
+                                        border_color=MATRIX_GREEN_BORDER, border_width=2,
+                                        hover_color=MATRIX_GREEN_HOVER,
                                         command=self.inventoryWindow)
         inventoryBtn.grid(row=0, column=1, padx=20, pady=20)
 
         cavebotBtn = customtkinter.CTkButton(self, text="Cave", corner_radius=32,
-                                        fg_color="transparent", border_color="#C20034",
-                                        border_width=2, hover_color="#C20034",
+                                        fg_color="transparent", text_color=MATRIX_GREEN,
+                                        border_color=MATRIX_GREEN_BORDER, border_width=2,
+                                        hover_color=MATRIX_GREEN_HOVER,
                                         command=self.caveWindow)
         cavebotBtn.grid(row=0, column=2, padx=20, pady=20)
 
         healingBtn = customtkinter.CTkButton(self, text="Healing", corner_radius=32,
-                                        fg_color="transparent", border_color="#C20034",
-                                        border_width=2, hover_color="#C20034",
+                                        fg_color="transparent", text_color=MATRIX_GREEN,
+                                        border_color=MATRIX_GREEN_BORDER, border_width=2,
+                                        hover_color=MATRIX_GREEN_HOVER,
                                         command=self.healingWindow)
         healingBtn.grid(row=1, column=0, padx=20, pady=20)
 
         comboBtn = customtkinter.CTkButton(self, text="Combo Spells", corner_radius=32,
-                                        fg_color="transparent", border_color="#C20034",
-                                        border_width=2, hover_color="#C20034",
+                                        fg_color="transparent", text_color=MATRIX_GREEN,
+                                        border_color=MATRIX_GREEN_BORDER, border_width=2,
+                                        hover_color=MATRIX_GREEN_HOVER,
                                         command=self.comboWindow)
         comboBtn.grid(row=1, column=1, padx=20, pady=20)
 
         self.enabledVar = BooleanVar()
         self.checkbutton = customtkinter.CTkCheckBox(
             self, text='Enabled', variable=self.enabledVar, command=self.onToggleEnabledButton,
-            hover_color="#870125", fg_color='#C20034')
+            text_color=MATRIX_GREEN, fg_color=MATRIX_GREEN, hover_color=MATRIX_GREEN_HOVER)
         self.checkbutton.grid(column=2, row=1, padx=20, pady=20, sticky='w')
 
         # WebSocket Client Initialization
@@ -68,19 +75,27 @@ class Application(customtkinter.CTk):
         self.ws_client = SpecterWebSocketClient(uri="ws://localhost:8765", message_queue=self.ws_message_queue)
         self.ws_client.start()
 
-        self.ws_status_label = customtkinter.CTkLabel(self, text="WS Status: Connecting...")
+        self.ws_status_label = customtkinter.CTkLabel(self, text="WS Status: Connecting...", text_color=MATRIX_GREEN)
         self.ws_status_label.grid(row=2, column=0, columnspan=3, padx=20, pady=10, sticky="ew")
 
         # Python Version UI
-        self.python_version_label = customtkinter.CTkLabel(self, text="Python Version: N/A")
+        self.python_version_label = customtkinter.CTkLabel(self, text="Python Version: N/A", text_color=MATRIX_GREEN)
         self.python_version_label.grid(row=3, column=0, columnspan=2, padx=20, pady=(5,0), sticky="w")
-        self.get_python_version_button = customtkinter.CTkButton(self, text="Get Python Version", command=self._get_python_version)
+        self.get_python_version_button = customtkinter.CTkButton(self, text="Get Python Version",
+                                                                fg_color="transparent", text_color=MATRIX_GREEN,
+                                                                border_color=MATRIX_GREEN_BORDER, border_width=2,
+                                                                hover_color=MATRIX_GREEN_HOVER,
+                                                                command=self._get_python_version)
         self.get_python_version_button.grid(row=3, column=2, padx=20, pady=(5,0), sticky="e")
 
         # Backend Status UI
-        self.backend_status_label = customtkinter.CTkLabel(self, text="Backend Status: N/A")
+        self.backend_status_label = customtkinter.CTkLabel(self, text="Backend Status: N/A", text_color=MATRIX_GREEN)
         self.backend_status_label.grid(row=4, column=0, columnspan=2, padx=20, pady=(5,10), sticky="w")
-        self.get_backend_status_button = customtkinter.CTkButton(self, text="Get Backend Status", command=self._get_backend_status)
+        self.get_backend_status_button = customtkinter.CTkButton(self, text="Get Backend Status",
+                                                                 fg_color="transparent", text_color=MATRIX_GREEN,
+                                                                 border_color=MATRIX_GREEN_BORDER, border_width=2,
+                                                                 hover_color=MATRIX_GREEN_HOVER,
+                                                                 command=self._get_backend_status)
         self.get_backend_status_button.grid(row=4, column=2, padx=20, pady=(5,10), sticky="e")
 
         self._poll_ws_queue()
@@ -118,7 +133,9 @@ class Application(customtkinter.CTk):
 
     def configurationWindow(self):
         if self.configPage is None or not self.configPage.winfo_exists():
-            self.configPage = ConfigPage(self.context)
+            self.configPage = ConfigPage(context=self.context, ws_client=self.ws_client)
+            # Potentially request initial settings for config page here via ws_client
+            # self.ws_client.send_message({"command": "config_get_initial_settings"})
         else:
             self.configPage.focus()
 
