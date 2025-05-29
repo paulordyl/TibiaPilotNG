@@ -11,10 +11,12 @@ from .ignoreCreaturesPage import IgnoreCreaturesPage
 import customtkinter
 import json
 from ...utils import genRanStr
+from ...theme import MATRIX_BLACK, MATRIX_GREEN, MATRIX_GREEN_HOVER, MATRIX_GREEN_BORDER
 
 class CavebotPage(customtkinter.CTkToplevel):
     def __init__(self, context):
         super().__init__()
+        self.configure(fg_color=MATRIX_BLACK)
         self.context = context
 
         self.title(genRanStr())
@@ -22,18 +24,35 @@ class CavebotPage(customtkinter.CTkToplevel):
 
         self.ignoreCreaturesPage = None
 
-        bg_color = self._apply_appearance_mode(customtkinter.ThemeManager.theme["CTkFrame"]["fg_color"])
-        text_color = self._apply_appearance_mode(customtkinter.ThemeManager.theme["CTkLabel"]["text_color"])
+        # bg_color = self._apply_appearance_mode(customtkinter.ThemeManager.theme["CTkFrame"]["fg_color"])
+        # text_color = self._apply_appearance_mode(customtkinter.ThemeManager.theme["CTkLabel"]["text_color"])
 
         treestyle = ttk.Style()
-        treestyle.theme_use('default')
-        treestyle.configure("Treeview", background=bg_color, foreground=text_color, fieldbackground=bg_color, borderwidth=0)
-        treestyle.configure("Treeview.Heading", background=bg_color, borderwidth=0, foreground="#C20034")
-        ttk.Style().map("Treeview.Heading",
-                background = [('pressed', '!focus', bg_color),
-                            ('active', bg_color),
-                            ('disabled',"#C20034")])
-        treestyle.map('Treeview', background=[('selected', '#C20034')], foreground=[('selected', '#FFF')])
+        treestyle.theme_use('default') # Or another base theme if 'default' causes issues with Matrix
+        treestyle.configure("Treeview", 
+                            background=MATRIX_BLACK, 
+                            foreground=MATRIX_GREEN, 
+                            fieldbackground=MATRIX_BLACK, 
+                            borderwidth=1, # Can be 0 if no border is preferred
+                            rowheight=25) # Optional: adjust row height
+        treestyle.configure("Treeview.Heading", 
+                            background=MATRIX_BLACK, 
+                            foreground=MATRIX_GREEN, 
+                            borderwidth=1, # Can be 0 or 1
+                            font=('TkDefaultFont', 8, 'bold')) # Font styling
+        
+        # Map for selected items and heading states
+        treestyle.map('Treeview', 
+                      background=[('selected', MATRIX_GREEN_BORDER)], 
+                      foreground=[('selected', MATRIX_BLACK)])
+        treestyle.map("Treeview.Heading",
+                      background=[('pressed', '!focus', MATRIX_GREEN_HOVER), 
+                                  ('active', MATRIX_GREEN_BORDER),
+                                  ('disabled', MATRIX_BLACK)], # Keep disabled heading subtle
+                      foreground=[('pressed', '!focus', MATRIX_BLACK),
+                                  ('active', MATRIX_BLACK),
+                                  ('disabled', MATRIX_GREEN_BORDER)])
+
         self.bind("<<TreeviewSelect>>", lambda event: self.focus_set())
 
         self.columnconfigure(0, weight=8)
@@ -46,13 +65,13 @@ class CavebotPage(customtkinter.CTkToplevel):
         self.depositItemsModal = None
         self.travelModal = None
 
-        self.tableFrame = customtkinter.CTkFrame(self)
+        self.tableFrame = customtkinter.CTkFrame(self, fg_color=MATRIX_BLACK, border_color=MATRIX_GREEN_BORDER, border_width=1)
         self.tableFrame.grid(row=0, column=0, rowspan=2, padx=10, pady=10, sticky="nsew")
         self.tableFrame.rowconfigure(0, weight=1)
         self.tableFrame.columnconfigure(0, weight=1)
 
         self.table = ttk.Treeview(self.tableFrame, columns=(
-            'label', 'type', 'coordinate', 'options'))
+            'label', 'type', 'coordinate', 'options'), style="Treeview")
         self.table.grid(row=0, column=0, rowspan=1, sticky='nsew')
         self.table.heading('label', text='Label')
         self.table.heading('type', text='Type')
@@ -70,7 +89,7 @@ class CavebotPage(customtkinter.CTkToplevel):
             self.table.insert('', 'end', values=(
                 waypoint['label'], waypoint['type'], waypoint['coordinate'], waypoint['options']))
             
-        self.directionsFrame = customtkinter.CTkFrame(self)
+        self.directionsFrame = customtkinter.CTkFrame(self, fg_color=MATRIX_BLACK, border_color=MATRIX_GREEN_BORDER, border_width=1)
         self.directionsFrame.grid(row=0, column=1, padx=10, pady=10, sticky="nsew")
         self.directionsFrame.columnconfigure(0, weight=1)
         self.directionsFrame.columnconfigure(1, weight=1)
@@ -78,196 +97,166 @@ class CavebotPage(customtkinter.CTkToplevel):
 
         self.waypointDirection = StringVar(value='center')
 
-        northOption = customtkinter.CTkRadioButton(self.directionsFrame, variable=self.waypointDirection,
-                                    text='North', value='north', fg_color="#C20034", hover_color="#870125")
+        radio_button_args = {
+            "variable": self.waypointDirection, 
+            "text_color": MATRIX_GREEN,
+            "fg_color": MATRIX_GREEN, 
+            "hover_color": MATRIX_GREEN_HOVER,
+            "border_color": MATRIX_GREEN_BORDER
+        }
+
+        northOption = customtkinter.CTkRadioButton(self.directionsFrame, text='North', value='north', **radio_button_args)
         northOption.grid(row=0, column=1)
 
-        westOption = customtkinter.CTkRadioButton(self.directionsFrame, variable=self.waypointDirection,
-                                    text='West', value='west', fg_color="#C20034", hover_color="#870125")
+        westOption = customtkinter.CTkRadioButton(self.directionsFrame, text='West', value='west', **radio_button_args)
         westOption.grid(row=1, column=0)
 
-        centerOption = customtkinter.CTkRadioButton(self.directionsFrame, variable=self.waypointDirection,
-                                    text='Center', value='center', fg_color="#C20034", hover_color="#870125")
+        centerOption = customtkinter.CTkRadioButton(self.directionsFrame, text='Center', value='center', **radio_button_args)
         centerOption.grid(row=1, column=1, pady=10)
 
-        eastOption = customtkinter.CTkRadioButton(self.directionsFrame, variable=self.waypointDirection,
-                                    text='East', value='east', fg_color="#C20034", hover_color="#870125")
+        eastOption = customtkinter.CTkRadioButton(self.directionsFrame, text='East', value='east', **radio_button_args)
         eastOption.grid(row=1, column=2)
 
-        southOption = customtkinter.CTkRadioButton(self.directionsFrame, variable=self.waypointDirection,
-                                    text='South', value='south', fg_color="#C20034", hover_color="#870125")
+        southOption = customtkinter.CTkRadioButton(self.directionsFrame, text='South', value='south', **radio_button_args)
         southOption.grid(row=2, column=1)
 
-        self.actionsFrame = customtkinter.CTkFrame(self)
+        self.actionsFrame = customtkinter.CTkFrame(self, fg_color=MATRIX_BLACK, border_color=MATRIX_GREEN_BORDER, border_width=1)
         self.actionsFrame.grid(row=1, column=1, padx=10, pady=10, sticky="nsew")
         self.actionsFrame.columnconfigure(0, weight=1, uniform='equal')
         self.actionsFrame.columnconfigure(1, weight=1, uniform='equal')
 
+        checkbox_args = {
+            "text_color": MATRIX_GREEN,
+            "fg_color": MATRIX_GREEN,
+            "hover_color": MATRIX_GREEN_HOVER,
+            "border_color": MATRIX_GREEN_BORDER,
+            "checkmark_color": MATRIX_BLACK
+        }
+        
+        button_args = {
+            "corner_radius": 32,
+            "fg_color": "transparent",
+            "text_color": MATRIX_GREEN,
+            "border_color": MATRIX_GREEN_BORDER,
+            "border_width": 2,
+            "hover_color": MATRIX_GREEN_HOVER
+        }
+
         self.enabledVar = BooleanVar()
         self.enabledVar.set(self.context.context['ng_cave']['enabled'])
         self.checkbutton = customtkinter.CTkCheckBox(
-            self.actionsFrame, text='Enabled', variable=self.enabledVar, command=self.onToggleEnabledButton,
-            hover_color="#870125", fg_color='#C20034')
+            self.actionsFrame, text='Enabled', variable=self.enabledVar, command=self.onToggleEnabledButton, **checkbox_args)
         self.checkbutton.grid(column=0, row=0, padx=5, pady=5, sticky='w')
 
         self.runToCreaturesVar = BooleanVar()
         self.runToCreaturesVar.set(self.context.context['ng_cave']['runToCreatures'])
         self.runToCreaturesButton = customtkinter.CTkCheckBox(
-            self.actionsFrame, text='Run to creatures', variable=self.runToCreaturesVar, command=self.onToggleRunButton,
-            hover_color="#870125", fg_color='#C20034')
+            self.actionsFrame, text='Run to creatures', variable=self.runToCreaturesVar, command=self.onToggleRunButton, **checkbox_args)
         self.runToCreaturesButton.grid(column=1, row=0, padx=5, pady=5, sticky='w')
 
         self.deleteWaypoints = customtkinter.CTkButton(
-            self.actionsFrame, text='Delete Waypoints', command=lambda: self.removeSelectedWaypoints(),
-            corner_radius=32, fg_color="transparent", border_color="#C20034",
-            border_width=2, hover_color="#C20034")
+            self.actionsFrame, text='Delete Waypoints', command=lambda: self.removeSelectedWaypoints(), **button_args)
         self.deleteWaypoints.grid(row=1, column=0, padx=5, pady=5, sticky='nsew')
         self.depositItemsHouseButton = customtkinter.CTkButton(
-            self.actionsFrame, text='Deposit House', command=lambda: self.addWaypoint('depositItemsHouse'),
-            corner_radius=32, fg_color="transparent", border_color="#C20034",
-            border_width=2, hover_color="#C20034")
+            self.actionsFrame, text='Deposit House', command=lambda: self.addWaypoint('depositItemsHouse'), **button_args)
         self.depositItemsHouseButton.grid(
             row=1, column=1, padx=5, pady=5, sticky='nsew')
 
         self.walkButton = customtkinter.CTkButton(
-            self.actionsFrame, text='Walk', command=lambda: self.addWaypoint('walk'),
-            corner_radius=32, fg_color="transparent", border_color="#C20034",
-            border_width=2, hover_color="#C20034")
+            self.actionsFrame, text='Walk', command=lambda: self.addWaypoint('walk'), **button_args)
         self.walkButton.grid(row=2, column=0, padx=5, pady=5, sticky='nsew')
 
         self.rightClickDirectionButton = customtkinter.CTkButton(
-            self.actionsFrame, text='RC Direction', command=lambda: self.addWaypoint('rightClickDirection'),
-            corner_radius=32, fg_color="transparent", border_color="#C20034",
-            border_width=2, hover_color="#C20034")
+            self.actionsFrame, text='RC Direction', command=lambda: self.addWaypoint('rightClickDirection'), **button_args)
         self.rightClickDirectionButton.grid(row=2, column=1, padx=5, pady=5, sticky='nsew')
 
-        self.walkButton = customtkinter.CTkButton(
-            self.actionsFrame, text='Walk Ignore', command=lambda: self.addWaypoint('walk', ignore=True),
-            corner_radius=32, fg_color="transparent", border_color="#C20034",
-            border_width=2, hover_color="#C20034")
-        self.walkButton.grid(row=3, column=0, padx=5, pady=5, sticky='nsew')
+        self.walkIgnoreButton = customtkinter.CTkButton( # Renamed variable for clarity
+            self.actionsFrame, text='Walk Ignore', command=lambda: self.addWaypoint('walk', ignore=True), **button_args)
+        self.walkIgnoreButton.grid(row=3, column=0, padx=5, pady=5, sticky='nsew')
 
-        self.walkButton = customtkinter.CTkButton(
-            self.actionsFrame, text='Walk Ignore Passinho', command=lambda: self.addWaypoint('walk', ignore=True, passinho=True),
-            corner_radius=32, fg_color="transparent", border_color="#C20034",
-            border_width=2, hover_color="#C20034")
-        self.walkButton.grid(row=3, column=1, padx=5, pady=5, sticky='nsew')
+        self.walkIgnorePassinhoButton = customtkinter.CTkButton( # Renamed variable for clarity
+            self.actionsFrame, text='Walk Ignore Passinho', command=lambda: self.addWaypoint('walk', ignore=True, passinho=True), **button_args)
+        self.walkIgnorePassinhoButton.grid(row=3, column=1, padx=5, pady=5, sticky='nsew')
 
         self.ropeButton = customtkinter.CTkButton(
-            self.actionsFrame, text='Rope', command=lambda: self.addWaypoint('useRope'),
-            corner_radius=32, fg_color="transparent", border_color="#C20034",
-            border_width=2, hover_color="#C20034")
+            self.actionsFrame, text='Rope', command=lambda: self.addWaypoint('useRope'), **button_args)
         self.ropeButton.grid(row=4, column=0, padx=5, pady=5, sticky='nsew')
 
         self.shovelButton = customtkinter.CTkButton(
-            self.actionsFrame, text='Shovel', command=lambda: self.addWaypoint('useShovel'),
-            corner_radius=32, fg_color="transparent", border_color="#C20034",
-            border_width=2, hover_color="#C20034")
+            self.actionsFrame, text='Shovel', command=lambda: self.addWaypoint('useShovel'), **button_args)
         self.shovelButton.grid(row=4, column=1, padx=5, pady=5, sticky='nsew')
 
         self.rightClickUseButton = customtkinter.CTkButton(
-            self.actionsFrame, text='Use Right Click', command=lambda: self.addWaypoint('rightClickUse'),
-            corner_radius=32, fg_color="transparent", border_color="#C20034",
-            border_width=2, hover_color="#C20034")
+            self.actionsFrame, text='Use Right Click', command=lambda: self.addWaypoint('rightClickUse'), **button_args)
         self.rightClickUseButton.grid(row=5, column=0, padx=5, pady=5, sticky='nsew')
 
         self.openDoorButton = customtkinter.CTkButton(
-            self.actionsFrame, text='Open Door', command=lambda: self.addWaypoint('openDoor'),
-            corner_radius=32, fg_color="transparent", border_color="#C20034",
-            border_width=2, hover_color="#C20034")
+            self.actionsFrame, text='Open Door', command=lambda: self.addWaypoint('openDoor'), **button_args)
         self.openDoorButton.grid(row=5, column=1, padx=5, pady=5, sticky='nsew')
 
         self.singleMoveButton = customtkinter.CTkButton(
-            self.actionsFrame, text='Single Move', command=lambda: self.addWaypoint('singleMove'),
-            corner_radius=32, fg_color="transparent", border_color="#C20034",
-            border_width=2, hover_color="#C20034")
+            self.actionsFrame, text='Single Move', command=lambda: self.addWaypoint('singleMove'), **button_args)
         self.singleMoveButton.grid(row=6, column=0, padx=5, pady=5, sticky='nsew')
 
         self.useLadderButton = customtkinter.CTkButton(
-            self.actionsFrame, text='Use Ladder', command=lambda: self.addWaypoint('useLadder'),
-            corner_radius=32, fg_color="transparent", border_color="#C20034",
-            border_width=2, hover_color="#C20034")
+            self.actionsFrame, text='Use Ladder', command=lambda: self.addWaypoint('useLadder'), **button_args)
         self.useLadderButton.grid(row=6, column=1, padx=5, pady=5, sticky='nsew')
 
         self.moveUpButton = customtkinter.CTkButton(
-            self.actionsFrame, text='Move Up', command=lambda: self.addWaypoint('moveUp'),
-            corner_radius=32, fg_color="transparent", border_color="#C20034",
-            border_width=2, hover_color="#C20034")
+            self.actionsFrame, text='Move Up', command=lambda: self.addWaypoint('moveUp'), **button_args)
         self.moveUpButton.grid(row=7, column=0, padx=5, pady=5, sticky='nsew')
         self.moveDownButton = customtkinter.CTkButton(
-            self.actionsFrame, text='Move Down', command=lambda: self.addWaypoint('moveDown'),
-            corner_radius=32, fg_color="transparent", border_color="#C20034",
-            border_width=2, hover_color="#C20034")
+            self.actionsFrame, text='Move Down', command=lambda: self.addWaypoint('moveDown'), **button_args)
         self.moveDownButton.grid(
             row=7, column=1, padx=5, pady=5, sticky='nsew')
 
         self.depositGoldButton = customtkinter.CTkButton(
-            self.actionsFrame, text='Deposit gold', command=lambda: self.addWaypoint('depositGold'),
-            corner_radius=32, fg_color="transparent", border_color="#C20034",
-            border_width=2, hover_color="#C20034")
+            self.actionsFrame, text='Deposit gold', command=lambda: self.addWaypoint('depositGold'), **button_args)
         self.depositGoldButton.grid(
             row=8, column=0, padx=5, pady=5, sticky='nsew')
         self.depositItemsButton = customtkinter.CTkButton(
-            self.actionsFrame, text='Deposit items', command=lambda: self.addWaypoint('depositItems'),
-            corner_radius=32, fg_color="transparent", border_color="#C20034",
-            border_width=2, hover_color="#C20034")
+            self.actionsFrame, text='Deposit items', command=lambda: self.addWaypoint('depositItems'), **button_args)
         self.depositItemsButton.grid(
             row=8, column=1, padx=5, pady=5, sticky='nsew')
 
         self.dropFlasksButton = customtkinter.CTkButton(
-            self.actionsFrame, text='Drop flasks', command=lambda: self.addWaypoint('dropFlasks'),
-            corner_radius=32, fg_color="transparent", border_color="#C20034",
-            border_width=2, hover_color="#C20034")
+            self.actionsFrame, text='Drop flasks', command=lambda: self.addWaypoint('dropFlasks'), **button_args)
         self.dropFlasksButton.grid(
             row=9, column=0, padx=5, pady=5, sticky='nsew')
         
         self.buyBackpackButton = customtkinter.CTkButton(
-            self.actionsFrame, text='Buy Backpack', command=lambda: self.openBackpackModal(),
-            corner_radius=32, fg_color="transparent", border_color="#C20034",
-            border_width=2, hover_color="#C20034")
+            self.actionsFrame, text='Buy Backpack', command=lambda: self.openBackpackModal(), **button_args)
         self.buyBackpackButton.grid(
             row=9, column=1, padx=5, pady=5, sticky='nsew')
 
         self.refillButton = customtkinter.CTkButton(
-            self.actionsFrame, text='Refill', command=lambda: self.openRefillModal(),
-            corner_radius=32, fg_color="transparent", border_color="#C20034",
-            border_width=2, hover_color="#C20034")
+            self.actionsFrame, text='Refill', command=lambda: self.openRefillModal(), **button_args)
         self.refillButton.grid(
             row=10, column=0, padx=5, pady=5, sticky='nsew')
 
         self.refillCheckerButton = customtkinter.CTkButton(
-            self.actionsFrame, text='Refill checker', command=lambda: self.openRefillCheckerModal(),
-            corner_radius=32, fg_color="transparent", border_color="#C20034",
-            border_width=2, hover_color="#C20034")
+            self.actionsFrame, text='Refill checker', command=lambda: self.openRefillCheckerModal(), **button_args)
         self.refillCheckerButton.grid(
             row=10, column=1, padx=5, pady=5, sticky='nsew')
         
         self.travelButton = customtkinter.CTkButton(
-            self.actionsFrame, text='Travel', command=lambda: self.addWaypoint('travel'),
-            corner_radius=32, fg_color="transparent", border_color="#C20034",
-            border_width=2, hover_color="#C20034")
+            self.actionsFrame, text='Travel', command=lambda: self.addWaypoint('travel'), **button_args)
         self.travelButton.grid(
             row=11, column=0, padx=5, pady=5, sticky='nsew')
         
         self.ignoreCreaturesButton = customtkinter.CTkButton(
-            self.actionsFrame, text='Ignorar Criaturas', command=self.ignoreCreaturesWindow,
-            corner_radius=32, fg_color="transparent", border_color="#C20034",
-            border_width=2, hover_color="#C20034")
+            self.actionsFrame, text='Ignorar Criaturas', command=self.ignoreCreaturesWindow, **button_args)
         self.ignoreCreaturesButton.grid(
             row=11, column=1, padx=5, pady=5, sticky='nsew')
         
-        self.saveConfigFrame = customtkinter.CTkFrame(self)
+        self.saveConfigFrame = customtkinter.CTkFrame(self, fg_color=MATRIX_BLACK, border_color=MATRIX_GREEN_BORDER, border_width=1)
         self.saveConfigFrame.grid(column=1, row=2, padx=10,
                             pady=10, sticky='nsew')
 
-        saveConfigButton = customtkinter.CTkButton(self.saveConfigFrame, text="Save Script", corner_radius=32,
-                                        fg_color="transparent", border_color="#C20034",
-                                        border_width=2, hover_color="#C20034", command=self.saveScript)
+        saveConfigButton = customtkinter.CTkButton(self.saveConfigFrame, text="Save Script", command=self.saveScript, **button_args)
         saveConfigButton.grid(row=0, column=0, padx=20, pady=20, sticky='nsew')
 
-        loadConfigButton = customtkinter.CTkButton(self.saveConfigFrame, text="Load Script", corner_radius=32,
-                                        fg_color="transparent", border_color="#C20034",
-                                        border_width=2, hover_color="#C20034", command=self.loadScript)
+        loadConfigButton = customtkinter.CTkButton(self.saveConfigFrame, text="Load Script", command=self.loadScript, **button_args)
         loadConfigButton.grid(row=0, column=1, padx=20, pady=20, sticky='nsew')
         
         self.saveConfigFrame.columnconfigure(0, weight=1, uniform='equal')
