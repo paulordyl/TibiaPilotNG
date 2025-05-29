@@ -282,18 +282,18 @@ class ConfigPage(customtkinter.CTkToplevel):
 
     def saveCfg(self):
         file = filedialog.asksaveasfilename(
-            defaultextension=".pilotng",
-            filetypes=[("PilotNG Cfg", "*.pilotng"), ("Todos os arquivos", "*.*")]
+            defaultextension=".skbcfg",
+            filetypes=[("SKB Cfg", "*.skbcfg"), ("Todos os arquivos", "*.*")]
         )
 
         if file:
             cfg = {
-                'ng_backpacks': self.context.context['ng_backpacks'],
+                'py_backpacks': self.context.context['py_backpacks'],
                 'general_hotkeys': self.context.context['general_hotkeys'],
                 'auto_hur': self.context.context['auto_hur'],
                 'alert': self.context.context['alert'],
                 'clear_stats': self.context.context['clear_stats'],
-                'ng_comboSpells': self.context.context['ng_comboSpells'],
+                'py_comboSpells': self.context.context['py_comboSpells'],
                 'healing': self.context.context['healing']
             }
             with open(file, 'w') as f:
@@ -302,8 +302,8 @@ class ConfigPage(customtkinter.CTkToplevel):
 
     def loadCfg(self):
         file = filedialog.askopenfilename(
-            defaultextension=".pilotng",
-            filetypes=[("PilotNG Cfg", "*.pilotng"), ("Todos os arquivos", "*.*")]
+            defaultextension=".skbcfg",
+            filetypes=[("SKB Cfg", "*.skbcfg"), ("Todos os arquivos", "*.*")]
         )
 
         if file:

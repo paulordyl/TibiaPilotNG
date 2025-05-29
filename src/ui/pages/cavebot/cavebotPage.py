@@ -398,8 +398,8 @@ class CavebotPage(customtkinter.CTkToplevel):
 
     def saveScript(self):
         file = filedialog.asksaveasfilename(
-            defaultextension=".pilotscript",
-            filetypes=[("PilotNG Script", "*.pilotscript"), ("Todos os arquivos", "*.*")]
+            defaultextension=".skbscript",
+            filetypes=[("SKB Script", "*.skbscript"), ("Todos os arquivos", "*.*")]
         )
 
         if file:
@@ -409,8 +409,8 @@ class CavebotPage(customtkinter.CTkToplevel):
 
     def loadScript(self):
         file = filedialog.askopenfilename(
-            defaultextension=".pilotscript",
-            filetypes=[("PilotNG Script", "*.pilotscript"), ("Todos os arquivos", "*.*")]
+            defaultextension=".skbscript",
+            filetypes=[("SKB Script", "*.skbscript"), ("Todos os arquivos", "*.*")]
         )
 
         if file:

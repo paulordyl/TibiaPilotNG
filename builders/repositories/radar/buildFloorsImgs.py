@@ -1,5 +1,5 @@
 import numpy as np
-from src.utils.image import loadFromRGBToGray
+from python_src.utils.image import loadFromRGBToGray
 
 
 def main():

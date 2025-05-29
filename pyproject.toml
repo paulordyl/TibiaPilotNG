@@ -1,5 +1,5 @@
 [tool.poetry]
-name = "TibiaPilotNG"
+name = "SKB"
 version = "0.1.0"
 description = ""
 authors = ["Paulo Lacerda <paulorl2810@gmail.com>", "lucasmonstro <joao.galiano.silva@gmail.com>"]
