@@ -1,14 +1,16 @@
-# 👑 Tibia PilotNG 👑
+# 👑 SKB 👑
 
-🤖 The most advanced 24/7 Full-Auto PixelBot for Tibia with Cavebot, Refiller, Depositer and more.
+🤖 SKB (formerly Tibia PilotNG) is an advanced 24/7 Full-Auto PixelBot for Tibia. Core logic has been migrated to Rust for improved performance and robustness, with the new core residing in the `rust_bot_ng` directory.
 
 ![Logo](docs/assets/images/logo.png)
 
 ## 📖 A brief history
 
-I started working on this bot in December 2023, I added all the necessary features to make it operational 24/7, which was active until today when I decided to stop the operation and publish my work and tell the experience of what it was like to have a tibia bot farm in 2024, I had 7 chars and 3 pcs, each char farmed an average of 10-11kk a day resulting in an average turnover of 30kk a day, on servers I played I dominated the minocults spot, placing bots on all floors, players gave up farming and dominant guilds didn't care. I hope you make the most of this bot, it's still 100% functional until the day I publish this source.
+This project began in December 2023 as PilotNG, a Python-based bot. It incorporated all necessary features for 24/7 operation and was actively used for bot farming. The original Python version demonstrated significant success, with multiple characters farming substantial amounts daily.
 
-Below I'll leave some images and videos of how it worked, prints of the bot's UI, and how to install and run it.
+Recognizing the potential for performance and maintainability improvements, the core functionalities of PilotNG have been rewritten in Rust, leading to the birth of SKB. The new Rust core, located in the `rust_bot_ng` directory, offers enhanced speed and robustness. While the Python version was functional, the migration to Rust marks a significant evolution of the project. This repository now contains the Rust-based SKB, building upon the lessons learned and successes of its Python predecessor.
+
+Below you'll find some images and videos of how the original bot worked, prints of its UI, and updated instructions on how to install and run the new Rust-based SKB.
 
 ## 📷 Gallery
 
@@ -62,11 +64,15 @@ THE BOT ONLY WORKS IN 1920X1080 RESOLUTION
 
 TESTED ONLY ON WIN10
 
-- [PYTHON 3.11.7](https://www.python.org/downloads/release/python-3117/)
-- [POETRY](https://python-poetry.org/)
+- [PYTHON 3.11.7](https://www.python.org/downloads/release/python-3117/) (Still required for utility scripts and potentially `XET-SpecterHID`)
+- [RUST (STABLE EDITION)](https://www.rust-lang.org/tools/install)
+- [CARGO](https://doc.rust-lang.org/cargo/getting-started/installation.html) (Usually installed with Rust)
+- [POETRY](https://python-poetry.org/) (If using Python utilities that depend on it)
 - [TESSERACT-WINDOWS](https://github.com/UB-Mannheim/tesseract/wiki)
 - [VIRTUAL DISPLAY](https://www.amyuni.com/downloads/usbmmidd_v2.zip&v=ybHKFZjSkVY)
 - [OBS](https://obsproject.com/pt-br/download)
+
+The primary configuration for the bot is now `rust_bot_ng/config.toml`.
 
 COMMANDS TO ACTIVATE THE VIRTUAL DISPLAY:
 
@@ -113,23 +119,43 @@ YOU NEED TO USE THIS CONFIGS IN YOUR CLIENT, OTHERWISE WILL NOT WORK
 
 🔴 USE AT YOUR OWN RISK
 
-- DOWNLOAD AND INSTALL THE SOFTWARE DEPENDENCIES
+- DOWNLOAD AND INSTALL THE SOFTWARE DEPENDENCIES (Rust, Python, Tesseract, etc.)
 
-- MAKE SURE THE ARDUINO IS PLUGGED IN
+- MAKE SURE THE ARDUINO IS PLUGGED IN (if used, see Hardware Requirements)
 
 - CLONE/DOWNLOAD THE PROJECT
 
-- DOWNLOAD THE PYTHON DEPENDENCIES
+### Running the Rust Core (SKB)
 
-```bash
-poetry install
-```
+1.  Navigate to the Rust core directory:
+    ```bash
+    cd rust_bot_ng
+    ```
+2.  Build the project (release mode for performance):
+    ```bash
+    cargo build --release
+    ```
+3.  Configure the bot by editing `config.toml`.
+4.  Run the compiled executable:
+    ```bash
+    target/release/rust_bot_ng.exe 
+    ```
+    (The executable name might vary based on your project configuration in `Cargo.toml`)
 
-- RUN THE PROJECT
+### Python Utilities (If still applicable)
 
-```bash
-poetry run python main.py
-```
+If you need to run Python-based utilities or scripts that are part of the project:
+
+1.  Ensure Python and Poetry are installed.
+2.  Install Python dependencies:
+    ```bash
+    poetry install
+    ```
+3.  Run the specific Python script (e.g., if `main.py` is now a utility or launcher):
+    ```bash
+    poetry run python main.py 
+    ```
+    (Or `python utility_script_name.py` as appropriate)
 
 ## 🤝 Contributing
 

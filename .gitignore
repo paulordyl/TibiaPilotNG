@@ -28,7 +28,6 @@ var/
 .vscode/
 venv
 
-
-# Added by cargo
-
-/target
+# Rust build output
+rust_bot_ng/target/
+py_rust_utils/target/

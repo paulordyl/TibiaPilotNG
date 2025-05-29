@@ -28,7 +28,7 @@ from src.repositories.gameWindow.creatures import getClosestCreature, getTargetC
 pyautogui.FAILSAFE = False
 pyautogui.PAUSE = 0
 
-class PilotNGThread:
+class LegacyGameLoopThread:
     # TODO: add typings
     def __init__(self, context):
         self.context = context
@@ -36,7 +36,7 @@ class PilotNGThread:
     def mainloop(self):
         while True:
             try:
-                if self.context.context['ng_pause']:
+                if self.context.context['py_pause']:
                     sleep(1)
                     continue
                 startTime = time()
@@ -44,9 +44,9 @@ class PilotNGThread:
                     self.context.context)
                 self.context.context = self.handleGameplayTasks(
                     self.context.context)
-                self.context.context = self.context.context['ng_tasksOrchestrator'].do(
+                self.context.context = self.context.context['py_tasksOrchestrator'].do(
                     self.context.context)
-                self.context.context['ng_radar']['lastCoordinateVisited'] = self.context.context['ng_radar']['coordinate']
+                self.context.context['py_radar']['lastCoordinateVisited'] = self.context.context['py_radar']['coordinate']
                 healingByPotions(self.context.context)
                 healingByMana(self.context.context)
                 healingBySpells(self.context.context)
@@ -66,7 +66,7 @@ class PilotNGThread:
                 print(traceback.format_exc())
 
     def handleGameData(self, context):
-        if context['ng_pause']:
+        if context['py_pause']:
             return context
         context = setScreenshotMiddleware(context)
         context = setRadarMiddleware(context)
@@ -75,10 +75,10 @@ class PilotNGThread:
         context = setGameWindowMiddleware(context)
         context = setDirectionMiddleware(context)
         context = setGameWindowCreaturesMiddleware(context)
-        if context['ng_cave']['enabled'] and context['ng_cave']['runToCreatures'] == True:
+        if context['py_cave']['enabled'] and context['py_cave']['runToCreatures'] == True:
             context = setHandleLootMiddleware(context)          
         else:
-            context['ng_cave']['targetCreature'] = getTargetCreature(context['gameWindow']['monsters'])
+            context['py_cave']['targetCreature'] = getTargetCreature(context['gameWindow']['monsters'])
         context = setWaypointIndexMiddleware(context)
         context = setMapPlayerStatusMiddleware(context)
         context = setMapStatsBarMiddleware(context)
@@ -87,31 +87,31 @@ class PilotNGThread:
 
     def handleGameplayTasks(self, context):
         # TODO: func to check if coord is none
-        if context['ng_radar']['coordinate'] is None:
+        if context['py_radar']['coordinate'] is None:
             return context
-        if any(coord is None for coord in context['ng_radar']['coordinate']):
+        if any(coord is None for coord in context['py_radar']['coordinate']):
             return context
-        context['ng_cave']['closestCreature'] = getClosestCreature(
-            context['gameWindow']['monsters'], context['ng_radar']['coordinate'])
-        currentTask = context['ng_tasksOrchestrator'].getCurrentTask(context)
+        context['py_cave']['closestCreature'] = getClosestCreature(
+            context['gameWindow']['monsters'], context['py_radar']['coordinate'])
+        currentTask = context['py_tasksOrchestrator'].getCurrentTask(context)
         if currentTask is not None and currentTask.name == 'selectChatTab':
             return context
-        if len(context['loot']['corpsesToLoot']) > 0 and context['ng_cave']['runToCreatures'] == True and context['ng_cave']['enabled']:
+        if len(context['loot']['corpsesToLoot']) > 0 and context['py_cave']['runToCreatures'] == True and context['py_cave']['enabled']:
             context['way'] = 'lootCorpses'
             if currentTask is not None and currentTask.rootTask is not None and currentTask.rootTask.name != 'lootCorpse':
-                context['ng_tasksOrchestrator'].setRootTask(context, None)
-            if context['ng_tasksOrchestrator'].getCurrentTask(context) is None:
+                context['py_tasksOrchestrator'].setRootTask(context, None)
+            if context['py_tasksOrchestrator'].getCurrentTask(context) is None:
                 # TODO: get closest dead corpse
                 firstDeadCorpse = context['loot']['corpsesToLoot'][0]
-                context['ng_tasksOrchestrator'].setRootTask(
+                context['py_tasksOrchestrator'].setRootTask(
                     context, LootCorpseTask(firstDeadCorpse))
             context['gameWindow']['previousMonsters'] = context['gameWindow']['monsters']
             return context
-        if context['ng_cave']['runToCreatures'] == True and context['ng_cave']['enabled']:
+        if context['py_cave']['runToCreatures'] == True and context['py_cave']['enabled']:
             hasCreaturesToAttackAfterCheck = hasCreaturesToAttack(context)
             if hasCreaturesToAttackAfterCheck:
-                if context['ng_cave']['closestCreature'] is not None:
-                    context['way'] = 'ng_cave'
+                if context['py_cave']['closestCreature'] is not None:
+                    context['way'] = 'py_cave'
                 else:
                     context['way'] = 'waypoint'
             else:
@@ -123,16 +123,16 @@ class PilotNGThread:
                 if not isTryingToAttackClosestCreature:
                     context = resolveCavebotTasks(context)
             elif context['way'] == 'waypoint':
-                if context['ng_tasksOrchestrator'].getCurrentTask(context) is None:
-                    currentWaypointIndex = context['ng_cave']['waypoints']['currentIndex']
-                    currentWaypoint = context['ng_cave']['waypoints']['items'][currentWaypointIndex]
-                    context['ng_tasksOrchestrator'].setRootTask(
+                if context['py_tasksOrchestrator'].getCurrentTask(context) is None:
+                    currentWaypointIndex = context['py_cave']['waypoints']['currentIndex']
+                    currentWaypoint = context['py_cave']['waypoints']['items'][currentWaypointIndex]
+                    context['py_tasksOrchestrator'].setRootTask(
                         context, resolveTasksByWaypoint(currentWaypoint))
-        elif context['ng_cave']['enabled'] and context['ng_tasksOrchestrator'].getCurrentTask(context) is None:
-                currentWaypointIndex = context['ng_cave']['waypoints']['currentIndex']
+        elif context['py_cave']['enabled'] and context['py_tasksOrchestrator'].getCurrentTask(context) is None:
+                currentWaypointIndex = context['py_cave']['waypoints']['currentIndex']
                 if currentWaypointIndex is not None:
-                    currentWaypoint = context['ng_cave']['waypoints']['items'][currentWaypointIndex]
-                    context['ng_tasksOrchestrator'].setRootTask(
+                    currentWaypoint = context['py_cave']['waypoints']['items'][currentWaypointIndex]
+                    context['py_tasksOrchestrator'].setRootTask(
                         context, resolveTasksByWaypoint(currentWaypoint))
 
         context['gameWindow']['previousMonsters'] = context['gameWindow']['monsters']

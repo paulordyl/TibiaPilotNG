@@ -1,0 +1,12 @@
+[package]
+name = "frontend_logic"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+wasm-bindgen = "0.2"
+console_error_panic_hook = "0.1.7" # For debugging WASM
+getrandom = { version = "0.2", features = ["js"] } # To help rand_core find its backend
+
+[lib]
+crate-type = ["cdylib", "rlib"] # cdylib for WASM, rlib for potential use by other Rust crates
