@@ -27,3 +27,8 @@ var/
 .idea/
 .vscode/
 venv
+
+
+# Added by cargo
+
+/target
