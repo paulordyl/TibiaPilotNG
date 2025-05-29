@@ -51,9 +51,9 @@ fn main() -> Result<(), AppError> {
     info!("Starting application");
 
     // Load configuration
-    let config = match config::settings::load_config("rust_bot_ng/config.toml") {
+    let config = match config::settings::load_config("skb_core/config.toml") {
         Ok(cfg) => {
-            info!("Configuration loaded successfully from rust_bot_ng/config.toml");
+            info!("Configuration loaded successfully from skb_core/config.toml");
             info!("Character Name: {}", cfg.general.character_name);
             cfg
         }
@@ -200,10 +200,10 @@ fn main() -> Result<(), AppError> {
     // Example for Say WaypointType
     cavebot.add_waypoint(Waypoint {
         label: "Greeting".to_string(),
-        waypoint_type: WaypointType::Say { message: "Hello from RustBot-NG!".to_string() },
+        waypoint_type: WaypointType::Say { message: "Hello from SKB!".to_string() },
         coordinate: (0,0,0), // Coordinate irrelevant
         duration_ms: None,
-        message: Some("Hello from RustBot-NG!".to_string()), // Optional field
+        message: Some("Hello from SKB!".to_string()), // Optional field
         hotkey: None,
     });
 

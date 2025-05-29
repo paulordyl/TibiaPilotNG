@@ -1,6 +1,6 @@
 # 👑 SKB 👑
 
-🤖 SKB (formerly Tibia PilotNG) is an advanced 24/7 Full-Auto PixelBot for Tibia. Core logic has been migrated to Rust for improved performance and robustness, with the new core residing in the `rust_bot_ng` directory.
+🤖 SKB (formerly Tibia PilotNG) is an advanced 24/7 Full-Auto PixelBot for Tibia. Core logic has been migrated to Rust for improved performance and robustness, with the new core residing in the `skb_core` directory.
 
 ![Logo](docs/assets/images/logo.png)
 
@@ -8,7 +8,7 @@
 
 This project began in December 2023 as PilotNG, a Python-based bot. It incorporated all necessary features for 24/7 operation and was actively used for bot farming. The original Python version demonstrated significant success, with multiple characters farming substantial amounts daily.
 
-Recognizing the potential for performance and maintainability improvements, the core functionalities of PilotNG have been rewritten in Rust, leading to the birth of SKB. The new Rust core, located in the `rust_bot_ng` directory, offers enhanced speed and robustness. While the Python version was functional, the migration to Rust marks a significant evolution of the project. This repository now contains the Rust-based SKB, building upon the lessons learned and successes of its Python predecessor.
+Recognizing the potential for performance and maintainability improvements, the core functionalities of PilotNG have been rewritten in Rust, leading to the birth of SKB. The new Rust core, located in the `skb_core` directory, offers enhanced speed and robustness. While the Python version was functional, the migration to Rust marks a significant evolution of the project. This repository now contains the Rust-based SKB, building upon the lessons learned and successes of its Python predecessor.
 
 Below you'll find some images and videos of how the original bot worked, prints of its UI, and updated instructions on how to install and run the new Rust-based SKB.
 
@@ -72,7 +72,7 @@ TESTED ONLY ON WIN10
 - [VIRTUAL DISPLAY](https://www.amyuni.com/downloads/usbmmidd_v2.zip&v=ybHKFZjSkVY)
 - [OBS](https://obsproject.com/pt-br/download)
 
-The primary configuration for the bot is now `rust_bot_ng/config.toml`.
+The primary configuration for the bot is now `skb_core/config.toml`.
 
 COMMANDS TO ACTIVATE THE VIRTUAL DISPLAY:
 
@@ -129,18 +129,18 @@ YOU NEED TO USE THIS CONFIGS IN YOUR CLIENT, OTHERWISE WILL NOT WORK
 
 1.  Navigate to the Rust core directory:
     ```bash
-    cd rust_bot_ng
+    cd skb_core
     ```
 2.  Build the project (release mode for performance):
     ```bash
     cargo build --release
     ```
-3.  Configure the bot by editing `config.toml`.
+3.  Configure the bot by editing `skb_core/config.toml`.
 4.  Run the compiled executable:
     ```bash
-    target/release/rust_bot_ng.exe 
+    target/release/skb_bin.exe 
     ```
-    (The executable name might vary based on your project configuration in `Cargo.toml`)
+    (The executable name `skb_bin` is defined in `skb_core/Cargo.toml`)
 
 ### Python Utilities (If still applicable)
 

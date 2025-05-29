@@ -13,7 +13,7 @@ fn release_keys(py: Python, last_pressed_key: Option<String>) -> PyResult<Option
         // For now, we'll just print a message.
         println!("Rust: keyUp({}) would be called here.", key);
     }
-    // The Python equivalent sets context['ng_lastPressedKey'] = None
+    // The Python equivalent sets context['py_lastPressedKey'] = None
     Ok(None)
 }
 
