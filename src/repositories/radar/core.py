@@ -1,14 +1,48 @@
+import ctypes # Added
 from numba import njit
 import numpy as np
-from scipy.spatial import distance
 from typing import Union
 from src.shared.typings import Coordinate, GrayImage, GrayPixel, WaypointList
 from src.utils.core import hashit, locate
+# Assuming py_rust_lib is accessible from src.utils.image, 
+# where it's initialized and other FFI functions are attached.
+# This avoids re-loading the library in multiple places.
+from src.utils.image import py_rust_lib # Added
 from src.utils.coordinate import getCoordinateFromPixel, getPixelFromCoordinate
 from .config import availableTilesFrictions, breakpointTileMovementSpeed, coordinates, dimensions, floorsImgs, floorsLevelsImgsHashes, floorsPathsSqms, nonWalkablePixelsColors, tilesFrictionsWithBreakpoints, walkableFloorsSqms
 from .extractors import getRadarImage
 from .locators import getRadarToolsPosition
 from .typings import FloorLevel, TileFriction
+
+
+# FFI Function Signature Setup 
+
+# find_closest_waypoint_index_rust
+if hasattr(py_rust_lib, 'find_closest_waypoint_index_rust'):
+    py_rust_lib.find_closest_waypoint_index_rust.argtypes = [
+        ctypes.c_double,                        # target_x
+        ctypes.c_double,                        # target_y
+        ctypes.c_int32,                         # target_z (floor level)
+        ctypes.POINTER(ctypes.c_double),        # waypoints_data_ptr (flat array of x,y,z)
+        ctypes.c_size_t                         # num_waypoints
+    ]
+    py_rust_lib.find_closest_waypoint_index_rust.restype = ctypes.c_ssize_t # index or -1
+else:
+    # Using print for warning, consistent with how it was done in src/utils/core.py
+    print("Warning: FFI function 'find_closest_waypoint_index_rust' not found in py_rust_lib.")
+
+# are_coordinates_close_rust
+if hasattr(py_rust_lib, 'are_coordinates_close_rust'):
+    py_rust_lib.are_coordinates_close_rust.argtypes = [
+        ctypes.c_double,                        # x1
+        ctypes.c_double,                        # y1
+        ctypes.c_double,                        # x2
+        ctypes.c_double,                        # y2
+        ctypes.c_double                         # distance_tolerance
+    ]
+    py_rust_lib.are_coordinates_close_rust.restype = ctypes.c_bool
+else:
+    print("Warning: FFI function 'are_coordinates_close_rust' not found in py_rust_lib.")
 
 
 # TODO: add unit tests
@@ -99,17 +133,47 @@ def getFloorLevel(screenshot: GrayImage) -> FloorLevel | None:
 # TODO: add unit tests
 # TODO: add perf
 def getClosestWaypointIndexFromCoordinate(coordinate: Coordinate, waypoints: WaypointList) -> Union[int, None]:
-    closestWaypointIndex = None
-    closestWaypointDistance = 9999
-    for waypointIndex, waypoint in enumerate(waypoints):
-        if waypoint['coordinate'][2] != coordinate[2]:
-            continue
-        waypointDistance = distance.cdist(
-            [(waypoint['coordinate'][0], waypoint['coordinate'][1])], [(coordinate[0], coordinate[1])]).flatten()[0]
-        if waypointDistance < closestWaypointDistance:
-            closestWaypointIndex = waypointIndex
-            closestWaypointDistance = waypointDistance
-    return closestWaypointIndex
+    if not hasattr(py_rust_lib, 'find_closest_waypoint_index_rust'):
+        raise RuntimeError("Rust FFI function 'find_closest_waypoint_index_rust' is not available.")
+
+    if not waypoints:
+        return None
+
+    target_x = float(coordinate[0])
+    target_y = float(coordinate[1])
+    target_z = int(coordinate[2]) # Assuming floor level is integer
+
+    # Extract coordinates from waypoints and flatten
+    # WaypointList is List[Dict[str, Any]], with waypoint['coordinate'] being (x,y,z)
+    # Rust expects a flat array: [x1,y1,z1, x2,y2,z2, ...]
+    flat_waypoints_data = []
+    for waypoint in waypoints:
+        wp_coord = waypoint['coordinate']
+        flat_waypoints_data.extend([float(wp_coord[0]), float(wp_coord[1]), float(wp_coord[2])]) # Keep z as float for array type consistency
+    
+    if not flat_waypoints_data: # Should not happen if waypoints list was not empty, but good check
+        return None
+
+    waypoints_np = np.array(flat_waypoints_data, dtype=np.float64)
+    # No need to check for C_CONTIGUOUS here if creating from a list of Python floats, 
+    # np.array will make it contiguous by default.
+
+    waypoints_ptr = waypoints_np.ctypes.data_as(ctypes.POINTER(ctypes.c_double))
+    num_waypoints = len(waypoints) # Number of 3D waypoints
+
+    closest_idx = py_rust_lib.find_closest_waypoint_index_rust(
+        ctypes.c_double(target_x),
+        ctypes.c_double(target_y),
+        ctypes.c_int32(target_z), # Passed as int32 to Rust
+        waypoints_ptr,
+        ctypes.c_size_t(num_waypoints)
+    )
+
+    if closest_idx < 0:
+        # Rust function indicates no suitable waypoint found or an error
+        return None
+    
+    return closest_idx
 
 
 # TODO: add perf
@@ -141,14 +205,27 @@ def getTileFrictionByCoordinate(coordinate: Coordinate) -> TileFriction:
 # TODO: add unit tests
 # TODO: add perf
 def isCloseToCoordinate(currentCoordinate: Coordinate, possibleCloseCoordinate: Coordinate, distanceTolerance: int = 10) -> bool:
-    (xOfCurrentCoordinate, yOfCurrentCoordinate, _) = currentCoordinate
-    XYOfCurrentCoordinate = (xOfCurrentCoordinate, yOfCurrentCoordinate)
-    (xOfPossibleCloseCoordinate, yOfPossibleCloseCoordinate, _) = possibleCloseCoordinate
-    XYOfPossibleCloseCoordinate = (
-        xOfPossibleCloseCoordinate, yOfPossibleCloseCoordinate)
-    euclideanDistance = distance.cdist(
-        [XYOfCurrentCoordinate], [XYOfPossibleCloseCoordinate])
-    return euclideanDistance <= distanceTolerance
+    if not hasattr(py_rust_lib, 'are_coordinates_close_rust'):
+        raise RuntimeError("Rust FFI function 'are_coordinates_close_rust' is not available.")
+
+    x1 = float(currentCoordinate[0])
+    y1 = float(currentCoordinate[1])
+    # z1 is ignored for 2D distance
+
+    x2 = float(possibleCloseCoordinate[0])
+    y2 = float(possibleCloseCoordinate[1])
+    # z2 is ignored for 2D distance
+    
+    # Ensure distanceTolerance is also float for FFI call
+    dt_float = float(distanceTolerance)
+
+    return py_rust_lib.are_coordinates_close_rust(
+        ctypes.c_double(x1),
+        ctypes.c_double(y1),
+        ctypes.c_double(x2),
+        ctypes.c_double(y2),
+        ctypes.c_double(dt_float)
+    )
 
 
 # TODO: add unit tests
