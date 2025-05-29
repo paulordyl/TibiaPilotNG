@@ -1,5 +1,5 @@
+import ctypes # Added
 import math
-from numba import njit
 import numpy as np
 import pathlib
 from scipy.spatial import distance
@@ -11,9 +11,54 @@ from src.shared.typings import Coordinate, GrayImage, Slot, SlotWidth, XYCoordin
 from src.utils.core import hashit
 from src.utils.coordinate import getPixelFromCoordinate
 from src.utils.image import loadFromRGBToGray
+# Assuming py_rust_lib and helpers are accessible from src.utils.image, 
+# where they are initialized and other FFI functions are attached.
+from src.utils.image import RustImageData, _numpy_to_rust_image_data, py_rust_lib # Added
 from src.utils.matrix import hasMatrixInsideOther
 from src.wiki.creatures import creatures as wikiCreatures
 from .typings import Creature, CreatureList
+
+
+class FoundBar(ctypes.Structure):
+    _fields_ = [
+        ("x", ctypes.c_int32),
+        ("y", ctypes.c_int32)
+    ]
+
+class FoundBarsResult(ctypes.Structure):
+    _fields_ = [
+        ("bars_ptr", ctypes.POINTER(FoundBar)),
+        ("count", ctypes.c_size_t)
+    ]
+
+
+# FFI Function Signature Setup 
+
+# find_creature_bars_rust
+if hasattr(py_rust_lib, 'find_creature_bars_rust'):
+    py_rust_lib.find_creature_bars_rust.argtypes = [RustImageData]
+    py_rust_lib.find_creature_bars_rust.restype = FoundBarsResult 
+else:
+    print("Warning: FFI function 'find_creature_bars_rust' not found in py_rust_lib.")
+
+# free_found_bars_result_rust
+if hasattr(py_rust_lib, 'free_found_bars_result_rust'):
+    py_rust_lib.free_found_bars_result_rust.argtypes = [FoundBarsResult]
+    py_rust_lib.free_found_bars_result_rust.restype = None
+else:
+    print("Warning: FFI function 'free_found_bars_result_rust' not found in py_rust_lib.")
+
+# check_creature_attack_status_rust
+if hasattr(py_rust_lib, 'check_creature_attack_status_rust'):
+    py_rust_lib.check_creature_attack_status_rust.argtypes = [
+        RustImageData,      # game_window_image_data
+        ctypes.c_int32,     # border_x
+        ctypes.c_int32,     # y_of_creature_bar
+        ctypes.c_int32      # slot_width
+    ]
+    py_rust_lib.check_creature_attack_status_rust.restype = ctypes.c_bool
+else:
+    print("Warning: FFI function 'check_creature_attack_status_rust' not found in py_rust_lib.")
 
 
 currentPath = pathlib.Path(__file__).parent.resolve()
@@ -66,39 +111,35 @@ def getClosestCreature(gameWindowCreatures, coordinate: Coordinate):
 
 # TODO: add unit tests
 # TODO: add perf
-@njit(fastmath=True)
-def getCreaturesBars(gameWindowImage: GrayImage) -> List[tuple[int, int]]:
-    bars = []
-    width = gameWindowImage.shape[1] - 27
-    height = gameWindowImage.shape[0] - 3
-    creatureIndex = 0
-    for y in range(height):
-        x = -1
-        while x < width:
-            x += 1
-            if gameWindowImage[y, x + 26] != 0:
-                x += 26
-                continue
-            bothBordersAreBlack = True
-            for l in range(25):
-                key = x + 25 - l
-                if gameWindowImage[y, key] != 0 or gameWindowImage[y + 3, key] != 0:
-                    bothBordersAreBlack = False
-                    x = key
-                    break
-            if bothBordersAreBlack == False:
-                continue
-            if (
-                gameWindowImage[y + 1, x] != 0 or
-                gameWindowImage[y + 2, x] != 0 or
-                gameWindowImage[y + 1, x + 26] != 0 or
-                gameWindowImage[y + 2, x + 26] != 0
-            ):
-                continue
-            bars.append((x, y))
-            creatureIndex += 1
-            x += 26
-    return bars
+def getCreaturesBars(gameWindowImage: GrayImage) -> List[Tuple[int, int]]:
+    if not hasattr(py_rust_lib, 'find_creature_bars_rust') or \
+       not hasattr(py_rust_lib, 'free_found_bars_result_rust'):
+        raise RuntimeError("Rust FFI functions for getCreaturesBars are not available.")
+
+    if _numpy_to_rust_image_data is None: # Should have been imported
+        raise RuntimeError("Helper function '_numpy_to_rust_image_data' is not available.")
+
+    # Convert input GrayImage (NumPy array) to RustImageData
+    rust_image_data = _numpy_to_rust_image_data(gameWindowImage, "GRAY")
+
+    # Call the FFI function, which returns the struct by value
+    rust_result = py_rust_lib.find_creature_bars_rust(rust_image_data)
+
+    py_bars_list = []
+    try:
+        if rust_result.bars_ptr and rust_result.count > 0:
+            # Convert C array of FoundBar structs to Python list of tuples
+            for i in range(rust_result.count):
+                bar = rust_result.bars_ptr[i]
+                py_bars_list.append((bar.x, bar.y))
+    finally:
+        # Free the memory allocated by Rust, regardless of whether bars were found or if an error occurred during list conversion.
+        # The free function should be safe to call even if rust_result.bars_ptr is null (e.g., if count is 0).
+        if hasattr(py_rust_lib, 'free_found_bars_result_rust'): # Check again in case it was missing initially
+            py_rust_lib.free_found_bars_result_rust(rust_result)
+        # If it was missing and we couldn't free, it might lead to a leak, but the initial check should prevent this.
+    
+    return py_bars_list
 
 
 # TODO: add unit tests
@@ -305,49 +346,26 @@ def hasTargetToCreature(gameWindowCreatures: CreatureList, gameWindowCreature: C
 # TODO: add unit tests
 # TODO: add perf
 # TODO: is possible to do at same time since everything is 64 pixels or per type(horizontal, vertical) of bar
-@njit(cache=True, fastmath=True)
 def isCreatureBeingAttacked(gameWindowImage: GrayImage, borderX: int, yOfCreatureBar: int, slotWidth: int) -> bool:
-    pixelsCount = 0
-    borderedCreatureImg = gameWindowImage[yOfCreatureBar + 5:yOfCreatureBar + 5 + slotWidth, borderX:borderX + slotWidth]
-    borderGap = 4 if slotWidth == 64 else 2
-    yOfBorder = slotWidth - borderGap
+    if not hasattr(py_rust_lib, 'check_creature_attack_status_rust'):
+        raise RuntimeError("Rust FFI function 'check_creature_attack_status_rust' is not available.")
 
-    if borderedCreatureImg.size == 0:
-        return False
+    if _numpy_to_rust_image_data is None: # Should have been imported
+        raise RuntimeError("Helper function '_numpy_to_rust_image_data' is not available.")
 
-    topBorder = borderedCreatureImg[0:borderGap, :].flatten()
-    if topBorder.size > 0:
-        for i in range(len(topBorder)):
-            if topBorder[i] == 76 or topBorder[i] == 166:
-                pixelsCount += 1
-                if pixelsCount > 50:
-                    return True
+    # Convert input GrayImage (NumPy array) to RustImageData
+    rust_image_data = _numpy_to_rust_image_data(gameWindowImage, "GRAY")
 
-    bottomBorder = borderedCreatureImg[yOfBorder:, :].flatten()
-    if bottomBorder.size > 0:
-        for i in range(len(bottomBorder)):
-            if bottomBorder[i] == 76 or bottomBorder[i] == 166:
-                pixelsCount += 1
-                if pixelsCount > 50:
-                    return True
-
-    leftBorder = borderedCreatureImg[borderGap:yOfBorder, 0:borderGap].flatten()
-    if leftBorder.size > 0:
-        for i in range(len(leftBorder)):
-            if leftBorder[i] == 76 or leftBorder[i] == 166:
-                pixelsCount += 1
-                if pixelsCount > 50:
-                    return True
-
-    rightBorder = borderedCreatureImg[borderGap:yOfBorder, yOfBorder:].flatten()
-    if rightBorder.size > 0:
-        for i in range(len(rightBorder)):
-            if rightBorder[i] == 76 or rightBorder[i] == 166:
-                pixelsCount += 1
-                if pixelsCount > 50:
-                    return True
-
-    return pixelsCount > 50
+    # Call the FFI function
+    # Ensure integer parameters are passed as ctypes.c_int32 as defined in argtypes
+    result = py_rust_lib.check_creature_attack_status_rust(
+        rust_image_data,
+        ctypes.c_int32(borderX),
+        ctypes.c_int32(yOfCreatureBar),
+        ctypes.c_int32(slotWidth)
+    )
+    
+    return result
 
 # TODO: add unit tests
 # TODO: add perf
