@@ -24,40 +24,51 @@ class Application(customtkinter.CTk):
         self.comboPage = None
         self.canvasWindow = None
 
-        configurationBtn = customtkinter.CTkButton(self, text="Configuration", corner_radius=32,
-                                        fg_color="transparent", border_color="#C20034",
-                                        border_width=2, hover_color="#C20034",
+        # Define the Matrix color palette
+        matrix_primary_color = "#39FF14"  # Matrix green
+        matrix_hover_color = "#2ECC71"    # Darker/alternative green
+        matrix_text_color = "#000000"     # Black for button text
+        corner_radius = 10                # Keeping corner radius
+
+        configurationBtn = customtkinter.CTkButton(self, text="Configuration", corner_radius=corner_radius,
+                                        fg_color=matrix_primary_color, border_color=matrix_primary_color,
+                                        border_width=2, hover_color=matrix_hover_color,
+                                        text_color=matrix_text_color,
                                         command=self.configurationWindow)
         configurationBtn.grid(row=0, column=0, padx=20, pady=20)
 
-        inventoryBtn = customtkinter.CTkButton(self, text="Inventory", corner_radius=32,
-                                        fg_color="transparent", border_color="#C20034",
-                                        border_width=2, hover_color="#C20034",
+        inventoryBtn = customtkinter.CTkButton(self, text="Inventory", corner_radius=corner_radius,
+                                        fg_color=matrix_primary_color, border_color=matrix_primary_color,
+                                        border_width=2, hover_color=matrix_hover_color,
+                                        text_color=matrix_text_color,
                                         command=self.inventoryWindow)
         inventoryBtn.grid(row=0, column=1, padx=20, pady=20)
 
-        cavebotBtn = customtkinter.CTkButton(self, text="Cave", corner_radius=32,
-                                        fg_color="transparent", border_color="#C20034",
-                                        border_width=2, hover_color="#C20034",
+        cavebotBtn = customtkinter.CTkButton(self, text="Cave", corner_radius=corner_radius,
+                                        fg_color=matrix_primary_color, border_color=matrix_primary_color,
+                                        border_width=2, hover_color=matrix_hover_color,
+                                        text_color=matrix_text_color,
                                         command=self.caveWindow)
         cavebotBtn.grid(row=0, column=2, padx=20, pady=20)
 
-        healingBtn = customtkinter.CTkButton(self, text="Healing", corner_radius=32,
-                                        fg_color="transparent", border_color="#C20034",
-                                        border_width=2, hover_color="#C20034",
+        healingBtn = customtkinter.CTkButton(self, text="Healing", corner_radius=corner_radius,
+                                        fg_color=matrix_primary_color, border_color=matrix_primary_color,
+                                        border_width=2, hover_color=matrix_hover_color,
+                                        text_color=matrix_text_color,
                                         command=self.healingWindow)
         healingBtn.grid(row=1, column=0, padx=20, pady=20)
 
-        comboBtn = customtkinter.CTkButton(self, text="Combo Spells", corner_radius=32,
-                                        fg_color="transparent", border_color="#C20034",
-                                        border_width=2, hover_color="#C20034",
+        comboBtn = customtkinter.CTkButton(self, text="Combo Spells", corner_radius=corner_radius,
+                                        fg_color=matrix_primary_color, border_color=matrix_primary_color,
+                                        border_width=2, hover_color=matrix_hover_color,
+                                        text_color=matrix_text_color,
                                         command=self.comboWindow)
         comboBtn.grid(row=1, column=1, padx=20, pady=20)
 
         self.enabledVar = BooleanVar()
         self.checkbutton = customtkinter.CTkCheckBox(
             self, text='Enabled', variable=self.enabledVar, command=self.onToggleEnabledButton,
-            hover_color="#870125", fg_color='#C20034')
+            hover_color=matrix_hover_color, fg_color=matrix_primary_color)
         self.checkbutton.grid(column=2, row=1, padx=20, pady=20, sticky='w')
 
     def configurationWindow(self):

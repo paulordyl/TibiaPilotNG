@@ -23,7 +23,6 @@ tcod = "^13.8.1"
 tinydb = "^4.8.0"
 customtkinter = "^5.2.2"
 requests = "^2.31.0"
-pyserial = "^3.5"
 scikit-image = "^0.22.0"
 pytesseract = "^0.3.10"
 

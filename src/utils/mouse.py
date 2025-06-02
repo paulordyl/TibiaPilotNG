@@ -1,30 +1,24 @@
 import pyautogui
 from src.shared.typings import XYCoordinate
-from .ino import sendCommandArduino
 
 def drag(x1y1: XYCoordinate, x2y2: XYCoordinate):
-    sendCommandArduino(f"moveTo,{int(x1y1[0])},{int(x1y1[1])}")
-    sendCommandArduino("dragStart")
-    sendCommandArduino(f"moveTo,{int(x2y2[0])},{int(x2y2[1])}")
-    sendCommandArduino("dragEnd")
+    pyautogui.moveTo(x1y1[0], x1y1[1], duration=0.2, tween=pyautogui.easeInOutQuad)
+    pyautogui.mouseDown()
+    pyautogui.moveTo(x2y2[0], x2y2[1], duration=0.3, tween=pyautogui.easeInOutQuad)
+    pyautogui.mouseUp()
 
 def leftClick(windowCoordinate: XYCoordinate = None):
-    if windowCoordinate is None:
-        sendCommandArduino("leftClick")
-        return
-    sendCommandArduino(f"moveTo,{int(windowCoordinate[0])},{int(windowCoordinate[1])}")
-    sendCommandArduino("leftClick")
+    if windowCoordinate:
+        pyautogui.moveTo(windowCoordinate[0], windowCoordinate[1], duration=0.2, tween=pyautogui.easeInOutQuad)
+    pyautogui.click()
 
 def moveTo(windowCoordinate: XYCoordinate):
-    sendCommandArduino(f"moveTo,{int(windowCoordinate[0])},{int(windowCoordinate[1])}")
+    pyautogui.moveTo(windowCoordinate[0], windowCoordinate[1], duration=0.2, tween=pyautogui.easeInOutQuad)
 
 def rightClick(windowCoordinate: XYCoordinate = None):
-    if windowCoordinate is None:
-        sendCommandArduino("rightClick")
-        return
-    sendCommandArduino(f"moveTo,{int(windowCoordinate[0])},{int(windowCoordinate[1])}")
-    sendCommandArduino("rightClick")
+    if windowCoordinate:
+        pyautogui.moveTo(windowCoordinate[0], windowCoordinate[1], duration=0.2, tween=pyautogui.easeInOutQuad)
+    pyautogui.click(button='right')
 
 def scroll(clicks: int):
-    curX, curY = pyautogui.position()
-    sendCommandArduino(f"scroll,{curX}, {curY}, {clicks}")
+    pyautogui.scroll(clicks)
