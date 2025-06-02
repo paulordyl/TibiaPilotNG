@@ -1,70 +1,36 @@
 import dxcam
 import numpy as np
-from typing import Callable, Union, List # Added List
+from typing import Callable, Union, List
 from src.shared.typings import BBox, GrayImage
-import ctypes
-from src.utils.image import RustImageData, _numpy_to_rust_image_data, _rust_to_numpy_image_data, py_rust_lib
-
-
-class MatchResult(ctypes.Structure):
-    _fields_ = [
-        ("x", ctypes.c_int32),
-        ("y", ctypes.c_int32),
-        ("width", ctypes.c_uint32),
-        ("height", ctypes.c_uint32),
-        ("confidence", ctypes.c_float)
-    ]
-
-
-class MatchResultArray(ctypes.Structure):
-    _fields_ = [
-        ("results", ctypes.POINTER(MatchResult)),
-        ("count", ctypes.c_size_t)
-    ]
-
-# FFI Function Signatures
-
-# locate_template_rust
-if hasattr(py_rust_lib, 'locate_template_rust'):
-    py_rust_lib.locate_template_rust.argtypes = [RustImageData, RustImageData, ctypes.c_float]
-    py_rust_lib.locate_template_rust.restype = ctypes.POINTER(MatchResult)
-else:
-    print("Warning: function 'locate_template_rust' not found in py_rust_lib.")
-
-# free_match_result_rust
-if hasattr(py_rust_lib, 'free_match_result_rust'):
-    py_rust_lib.free_match_result_rust.argtypes = [ctypes.POINTER(MatchResult)]
-    py_rust_lib.free_match_result_rust.restype = None
-else:
-    print("Warning: function 'free_match_result_rust' not found in py_rust_lib.")
-
-# locate_all_templates_rust
-if hasattr(py_rust_lib, 'locate_all_templates_rust'):
-    py_rust_lib.locate_all_templates_rust.argtypes = [RustImageData, RustImageData, ctypes.c_float]
-    py_rust_lib.locate_all_templates_rust.restype = MatchResultArray # Returned by value
-else:
-    print("Warning: function 'locate_all_templates_rust' not found in py_rust_lib.")
-
-# free_match_result_array_rust
-if hasattr(py_rust_lib, 'free_match_result_array_rust'):
-    py_rust_lib.free_match_result_array_rust.argtypes = [MatchResultArray] # Passed by value
-    py_rust_lib.free_match_result_array_rust.restype = None
-else:
-    print("Warning: function 'free_match_result_array_rust' not found in py_rust_lib.")
-
-# convert_bgra_to_grayscale_rust
-if hasattr(py_rust_lib, 'convert_bgra_to_grayscale_rust'):
-    py_rust_lib.convert_bgra_to_grayscale_rust.argtypes = [RustImageData] # Pass by value
-    py_rust_lib.convert_bgra_to_grayscale_rust.restype = ctypes.POINTER(RustImageData)
-else:
-    print("Warning: function 'convert_bgra_to_grayscale_rust' not found in py_rust_lib.")
-
-# farmhash_image_data_rust
-if hasattr(py_rust_lib, 'farmhash_image_data_rust'):
-    py_rust_lib.farmhash_image_data_rust.argtypes = [RustImageData] # Input is RustImageData by value
-    py_rust_lib.farmhash_image_data_rust.restype = ctypes.c_uint64
-else:
-    print("Warning: FFI function 'farmhash_image_data_rust' not found in py_rust_lib.")
+# Attempt to import the new PyO3 module
+try:
+    from skb_core import rust_utils_module as skb_rust_utils
+except ImportError:
+    # Fallback or error handling if the module is not found.
+    # For this refactoring, we'll assume it will be available.
+    # If you have an old FFI module name like `py_rust_utils` and want to try it as a fallback:
+    # try:
+    #     from py_rust_utils import lib as py_rust_lib_old_ffi
+    #     # Further checks if this old FFI is what we expect or if it's truly the PyO3 module
+    #     # This part can get complex if names are ambiguous.
+    #     # For now, we rely on the new skb_core path.
+    #     print("Warning: skb_core.rust_utils_module not found. Ensure the Rust library is compiled and accessible.")
+    #     # You might want to define a mock skb_rust_utils here for linting/testing if needed
+    #     class MockRustUtils:
+    #         def __getattr__(self, name):
+    #             raise NotImplementedError(f"Rust function {name} is not available (skb_core not found).")
+    #     skb_rust_utils = MockRustUtils()
+    # except ImportError:
+    #     print("Critical: Neither skb_core.rust_utils_module nor py_rust_utils found.")
+    #     # Define a mock skb_rust_utils to allow the rest of the file to be parsed for now.
+    class MockRustUtils:
+        def __getattr__(self, name):
+            # This will raise an AttributeError if a function is called,
+            # indicating the module isn't properly loaded.
+            print(f"Attempted to call '{name}' on a non-existent skb_rust_utils module.")
+            raise AttributeError(f"Rust function {name} is not available (skb_core.rust_utils_module not found).")
+    skb_rust_utils = MockRustUtils()
+    print("Warning: skb_core.rust_utils_module not found. Using a mock object. Ensure Rust library is compiled and in PYTHONPATH.")
 
 
 camera = dxcam.create(device_idx=0, output_idx=1, output_color='BGRA')
@@ -99,153 +65,121 @@ def cacheObjectPosition(func: Callable) -> Callable:
 
 # TODO: add unit tests
 def hashit(arr: np.ndarray) -> int:
-    # Ensure FFI function is available
-    if not hasattr(py_rust_lib, 'farmhash_image_data_rust'):
-        raise RuntimeError("Rust FFI function 'farmhash_image_data_rust' is not available.")
+    """
+    Hashes a NumPy array using the Rust `hash_image_data` function.
+    The input array `arr` is expected to be a 2D NumPy array (grayscale).
+    """
+    if not isinstance(arr, np.ndarray):
+        # The PyO3 function will also perform type checking, but good to have it here.
+        raise TypeError("Input must be a NumPy array.")
+    if arr.ndim != 2:
+        # The Rust function `hash_image_data` expects PyReadonlyArray2<u8>
+        raise ValueError(f"Unsupported array ndim for hashit: {arr.ndim}. Expected 2 (grayscale).")
     
-    # _numpy_to_rust_image_data must also be available from imports.
-    if _numpy_to_rust_image_data is None:
-        raise RuntimeError("Helper function '_numpy_to_rust_image_data' for Rust data conversion is not available.")
-
-    # 1. Convert NumPy array to RustImageData
-    # The format string "BYTES" is a placeholder; Rust side will use dimensions from RustImageData
-    # to calculate total length of bytes to hash from arr.data.
-    # The _numpy_to_rust_image_data function handles making the array C-contiguous if needed by its internal logic
-    # before getting the data pointer, or gets a pointer to existing C-contiguous data.
-    # The key is that RustImageData.data points to the start of the byte buffer.
-    
-    # Determine format based on ndim, similar to previous migrations, to correctly populate channels.
-    if arr.ndim == 2:
-        format_str = "GRAY" # Effectively 1 channel
-    elif arr.ndim == 3:
-        format_str = "RGB" # Or BGR, etc. Number of channels will be derived from shape.
-                           # For hashing, actual color format might not matter as much as byte sequence.
-    else:
-        # For a generic 1D array or other dimensionalities, we might need a different approach
-        # or assume "BYTES" and let Rust derive from total size if possible.
-        # However, hashit is primarily used with image slices (2D or 3D).
-        # Let's stick to what _numpy_to_rust_image_data supports well.
-        raise ValueError(f"Unsupported array ndim for hashit: {arr.ndim}")
-
-    rust_image_data = _numpy_to_rust_image_data(arr, format_str)
-    
-    # 2. Call the FFI function
-    hash_value = py_rust_lib.farmhash_image_data_rust(rust_image_data)
-    
-    # 3. Return the result (it's already a Python int compatible with uint64 from ctypes)
-    return hash_value
+    # Ensure the array is C-contiguous and uint8, as PyO3 functions often expect this.
+    # PyReadonlyArray2<u8> implies uint8.
+    if arr.dtype != np.uint8:
+        arr = arr.astype(np.uint8)
+    if not arr.flags['C_CONTIGUOUS']:
+        arr = np.ascontiguousarray(arr)
+        
+    try:
+        return skb_rust_utils.hash_image_data(arr)
+    except AttributeError as e:
+        # This can happen if skb_rust_utils is the MockObject due to import failure
+        print(f"Error calling skb_rust_utils.hash_image_data: {e}. Ensure skb_core module is correctly built and imported.")
+        raise
+    except Exception as e:
+        # Catch other potential errors from the Rust call
+        print(f"An error occurred in skb_rust_utils.hash_image_data: {e}")
+        raise
 
 
 # TODO: add unit tests
 def locate(compareImage: GrayImage, img: GrayImage, confidence: float = 0.85, type=None) -> Union[BBox, None]:
-    # The 'type' argument is now unused, can be removed or ignored.
-    # For compatibility, it's kept but not used. Defaulting to None to signify it's not used.
+    """
+    Locates a template `img` within `compareImage` using Rust's `locate_template`.
+    Inputs are expected to be grayscale NumPy arrays.
+    The 'type' argument is unused.
+    """
+    # Ensure inputs are NumPy arrays, C-contiguous, and uint8
+    # PyReadonlyArray2<u8> in Rust expects this.
+    if not isinstance(compareImage, np.ndarray) or compareImage.dtype != np.uint8 or not compareImage.flags['C_CONTIGUOUS']:
+        compareImage = np.ascontiguousarray(compareImage, dtype=np.uint8)
+    if not isinstance(img, np.ndarray) or img.dtype != np.uint8 or not img.flags['C_CONTIGUOUS']:
+        img = np.ascontiguousarray(img, dtype=np.uint8)
 
-    if not hasattr(py_rust_lib, 'locate_template_rust') or not hasattr(py_rust_lib, 'free_match_result_rust'):
-        # Fallback to original cv2 logic or raise error if functions are missing
-        # For this migration, we'll raise an error as cv2 will be removed.
-        raise RuntimeError("Rust FFI functions for locate are not available and cv2 fallback is removed.")
+    if compareImage.ndim != 2 or img.ndim != 2:
+        raise ValueError("locate expects 2D grayscale images.")
 
-    # 1. Convert NumPy arrays to RustImageData
-    # Assuming GrayImage means ndim=2, so format is "GRAY"
-    # If not, this needs more robust format detection like in image.py's crop/save
-    format_haystack = "GRAY" if compareImage.ndim == 2 else "RGB" # Basic check
-    format_needle = "GRAY" if img.ndim == 2 else "RGB" # Basic check
-    
-    rust_haystack = _numpy_to_rust_image_data(compareImage, format_haystack)
-    rust_needle = _numpy_to_rust_image_data(img, format_needle)
-
-    # 2. Call the FFI function
-    match_result_ptr = py_rust_lib.locate_template_rust(rust_haystack, rust_needle, ctypes.c_float(confidence))
-
-    # 3. Process the result
-    if match_result_ptr: # Check if the pointer is not NULL
-        try:
-            match_data = match_result_ptr.contents
-            # Ensure width and height from match_data are used, as these might be from the needle.
-            # The original python code returned len(img[0]), len(img) which are needle's width and height.
-            # So, match_data.width and match_data.height should correspond to this.
-            bbox: BBox = (match_data.x, match_data.y, match_data.width, match_data.height)
-            # 4. Free Rust-allocated memory
-            py_rust_lib.free_match_result_rust(match_result_ptr)
-            return bbox
-        except ValueError: # Handles potential null pointer access if .contents fails on bad ptr
-            if match_result_ptr: # Only free if pointer was not initially null
-                 py_rust_lib.free_match_result_rust(match_result_ptr)
-            return None # Or raise an error
-    else:
-        return None
+    try:
+        # The Rust function returns Option<(i32, i32, u32, u32)> which PyO3 converts to Python's None or a tuple.
+        result = skb_rust_utils.locate_template(compareImage, img, confidence)
+        return result # result is already BBox (tuple) or None
+    except AttributeError as e:
+        print(f"Error calling skb_rust_utils.locate_template: {e}. Ensure skb_core module is correctly built and imported.")
+        raise
+    except Exception as e:
+        print(f"An error occurred in skb_rust_utils.locate_template: {e}")
+        raise
 
 
 # TODO: add unit tests
 def locateMultiple(compareImg: GrayImage, img: GrayImage, confidence: float = 0.85) -> List[BBox]:
-    if not hasattr(py_rust_lib, 'locate_all_templates_rust') or not hasattr(py_rust_lib, 'free_match_result_array_rust'):
-        raise RuntimeError("Rust FFI functions for locateMultiple are not available and cv2 fallback is removed.")
+    """
+    Locates all occurrences of a template `img` within `compareImg` using Rust's `locate_all_templates`.
+    Inputs are expected to be grayscale NumPy arrays.
+    """
+    if not isinstance(compareImg, np.ndarray) or compareImg.dtype != np.uint8 or not compareImg.flags['C_CONTIGUOUS']:
+        compareImg = np.ascontiguousarray(compareImg, dtype=np.uint8)
+    if not isinstance(img, np.ndarray) or img.dtype != np.uint8 or not img.flags['C_CONTIGUOUS']:
+        img = np.ascontiguousarray(img, dtype=np.uint8)
 
-    # 1. Convert NumPy arrays to RustImageData
-    format_haystack = "GRAY" if compareImg.ndim == 2 else "RGB"
-    format_needle = "GRAY" if img.ndim == 2 else "RGB"
-    
-    rust_haystack = _numpy_to_rust_image_data(compareImg, format_haystack)
-    rust_needle = _numpy_to_rust_image_data(img, format_needle)
+    if compareImg.ndim != 2 or img.ndim != 2:
+        raise ValueError("locateMultiple expects 2D grayscale images.")
 
-    # 2. Call the FFI function
-    # This returns MatchResultArray by value
-    match_array_struct = py_rust_lib.locate_all_templates_rust(rust_haystack, rust_needle, ctypes.c_float(confidence))
-
-    resultList: List[BBox] = []
-    # 3. Process the result
-    if match_array_struct.results: # Check if the pointer to results is not NULL
-        try:
-            for i in range(match_array_struct.count):
-                match_data = match_array_struct.results[i]
-                # Ensure width and height are from the match_data (i.e., needle's dimensions)
-                bbox: BBox = (match_data.x, match_data.y, match_data.width, match_data.height)
-                resultList.append(bbox)
-        finally: # Ensure memory is freed even if an error occurs during list processing
-            # 4. Free Rust-allocated memory
-            py_rust_lib.free_match_result_array_rust(match_array_struct)
-    else: # If results pointer is NULL, still need to call free for the (empty) array structure if Rust expects it
-          # Or if Rust guarantees results is null ONLY IF count is 0 and no allocation happened for the array itself,
-          # then freeing might be conditional. Assuming Rust always allocates the MatchResultArray struct and its .results
-          # pointer, which might be null if count is 0. The free function should handle this.
-        py_rust_lib.free_match_result_array_rust(match_array_struct)
-
-
-    return resultList
+    try:
+        # The Rust function returns Vec<(i32, i32, u32, u32)> which PyO3 converts to a Python list of tuples.
+        result = skb_rust_utils.locate_all_templates(compareImg, img, confidence)
+        return result # result is already List[BBox]
+    except AttributeError as e:
+        print(f"Error calling skb_rust_utils.locate_all_templates: {e}. Ensure skb_core module is correctly built and imported.")
+        raise
+    except Exception as e:
+        print(f"An error occurred in skb_rust_utils.locate_all_templates: {e}")
+        raise
 
 
 # TODO: add unit tests
 def getScreenshot() -> GrayImage:
     global camera, latestScreenshot
-    # Ensure FFI functions are available
-    if not hasattr(py_rust_lib, 'convert_bgra_to_grayscale_rust'):
-        raise RuntimeError("Rust FFI function convert_bgra_to_grayscale_rust is not available.")
-    # _rust_to_numpy_image_data (which calls free_image_data_rust) must also be available from imports.
-    if _numpy_to_rust_image_data is None or _rust_to_numpy_image_data is None:
-        raise RuntimeError("Helper functions for Rust data conversion are not available.")
+    screenshot_raw = camera.grab() # This is a BGRA numpy array from dxcam, typically HxWx4 uint8
 
-    screenshot_raw = camera.grab() # This is a BGRA numpy array from dxcam
-    
     if screenshot_raw is None:
-        # Return the previous screenshot if grab fails
-        return latestScreenshot
+        return latestScreenshot # Return the previous screenshot if grab fails
 
-    # 1. Convert BGRA NumPy array to RustImageData
-    # DXCam returns BGRA, so "BGRA" is the format string.
-    # The `screenshot_raw` is a NumPy array.
-    rust_bgra_image = _numpy_to_rust_image_data(screenshot_raw, "BGRA")
+    # Ensure screenshot_raw is a NumPy array, uint8, C-contiguous, and HxWx4
+    if not isinstance(screenshot_raw, np.ndarray) or screenshot_raw.dtype != np.uint8:
+        screenshot_raw = np.array(screenshot_raw, dtype=np.uint8)
+    if not screenshot_raw.flags['C_CONTIGUOUS']:
+        screenshot_raw = np.ascontiguousarray(screenshot_raw)
 
-    # 2. Call the FFI function for BGRA to Grayscale conversion
-    rust_gray_image_ptr = py_rust_lib.convert_bgra_to_grayscale_rust(rust_bgra_image)
-
-    # 3. Convert the result back to a NumPy array (and free Rust memory)
-    if rust_gray_image_ptr:
-        latestScreenshot = _rust_to_numpy_image_data(rust_gray_image_ptr)
+    if screenshot_raw.ndim == 3 and screenshot_raw.shape[2] == 4:
+        try:
+            # PyO3 function `convert_bgra_to_grayscale` expects PyReadonlyArray3<u8> (HxWx4)
+            latestScreenshot = skb_rust_utils.convert_bgra_to_grayscale(screenshot_raw)
+            return latestScreenshot
+        except AttributeError as e:
+            print(f"Error calling skb_rust_utils.convert_bgra_to_grayscale: {e}. Ensure skb_core module is correctly built and imported.")
+            # Fallback to returning previous screenshot or raise error
+            return latestScreenshot
+        except Exception as e:
+            print(f"An error occurred in skb_rust_utils.convert_bgra_to_grayscale: {e}")
+            # Fallback
+            return latestScreenshot
+    elif screenshot_raw.ndim == 2: # Already grayscale? Unlikely from DXCam BGRA but handle defensively.
+        latestScreenshot = screenshot_raw
         return latestScreenshot
     else:
-        # Handle error: if Rust conversion fails and returns null
-        # Log an error or raise an exception. For now, return previous screenshot.
-        # This case might indicate an issue with the Rust conversion.
-        # Consider logging: print("Error: Rust BGRA to Grayscale conversion failed.")
-        return latestScreenshot # Fallback to previous screenshot
+        print(f"Warning: Unexpected screenshot format from DXCam. Shape: {screenshot_raw.shape}, dtype: {screenshot_raw.dtype}. Returning previous screenshot.")
+        return latestScreenshot
