@@ -1,3 +1,4 @@
+import random
 from src.repositories.actionBar.core import getSlotCount
 from src.shared.typings import Waypoint
 from ...typings import Context
@@ -42,7 +43,25 @@ class RefillTask(VectorTask):
             BuyItemTask(self.waypoint['options']['healthPotion']['item'], amountOfHealthPotionsToBuy, ignore=not self.waypoint['options']['healthPotionEnabled']).setParentTask(
                 self).setRootTask(self),
             CloseNpcTradeBoxTask().setParentTask(self).setRootTask(self),
-            UseHotkeyTask(context['healing']['potions']['firstManaPotion']['hotkey'], delayAfterComplete=1).setParentTask(self).setRootTask(self),
+            UseHotkeyTask(context['healing']['potions']['firstManaPotion']['hotkey'], delayAfterComplete=random.uniform(0.8, 1.2)).setParentTask(self).setRootTask(self),
             SetNextWaypointTask().setParentTask(self).setRootTask(self),
         ]
+
+        default_random_delay_range = (0.2, 0.5)
+        say_task_delay_range = (0.3, 0.6)
+
+        # Apply delays
+        self.tasks[0].delayAfterComplete = random.uniform(*default_random_delay_range) # SelectChatTabTask
+        self.tasks[1].delayAfterComplete = random.uniform(*default_random_delay_range) # EnableChatTask
+        self.tasks[2].delayAfterComplete = random.uniform(*say_task_delay_range)      # SayTask 'hi'
+        self.tasks[3].delayAfterComplete = random.uniform(*default_random_delay_range) # EnableChatTask
+        self.tasks[4].delayAfterComplete = random.uniform(*say_task_delay_range)      # SayTask 'potions' or 'trade'
+        self.tasks[5].delayAfterComplete = random.uniform(*default_random_delay_range) # SetChatOffTask
+        self.tasks[6].delayAfterComplete = random.uniform(*default_random_delay_range) # BuyItemTask mana
+        self.tasks[7].delayAfterComplete = random.uniform(*default_random_delay_range) # BuyItemTask health
+        self.tasks[8].delayAfterComplete = random.uniform(*default_random_delay_range) # CloseNpcTradeBoxTask
+        # self.tasks[9] is UseHotkeyTask, already handled
+        # self.tasks[10] is SetNextWaypointTask, can leave its default (0) or add a small one if desired
+        # self.tasks[10].delayAfterComplete = random.uniform(0.1, 0.2)
+
         return context

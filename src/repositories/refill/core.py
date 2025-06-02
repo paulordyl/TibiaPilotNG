@@ -1,4 +1,5 @@
-from time import sleep
+import random
+import time
 from typing import Union
 from src.shared.typings import BBox, GrayImage
 from src.utils.core import cacheObjectPosition, locate, getScreenshot
@@ -34,11 +35,11 @@ def getTradeBottomPos(screenshot: GrayImage) -> Union[BBox, None]:
 def findItem(screenshot: GrayImage, itemName: str):
     (bx, by, _, _) = getTradeBottomPos(screenshot)
     leftClick((bx + 160, by - 75))
-    sleep(0.2)
+    time.sleep(random.uniform(0.15, 0.25))
     leftClick((bx + 16, by - 75))
-    sleep(0.2)
+    time.sleep(random.uniform(0.15, 0.25))
     write(itemName)
-    sleep(2)
+    time.sleep(random.uniform(1.8, 2.2))
     screenshotAfterFind = getScreenshot()
     itemImg = images[itemName]
     itemPos = locate(screenshotAfterFind, itemImg)
@@ -53,9 +54,9 @@ def findItem(screenshot: GrayImage, itemName: str):
 def setAmount(screenshot: GrayImage, amount: int):
     (bx, by, _, _) = getTradeBottomPos(screenshot)
     leftClick((bx + 115, by - 42))
-    sleep(0.2)
+    time.sleep(random.uniform(0.15, 0.25))
     hotkey('ctrl', 'a')
-    sleep(0.2)
+    time.sleep(random.uniform(0.15, 0.25))
     press('backspace')
     write(str(amount))
 
@@ -82,10 +83,10 @@ def clearSearchBox(screenshot: GrayImage):
 # TODO: add perf
 def buyItem(screenshot: GrayImage, itemName: str, itemQuantity: int):
     findItem(screenshot, itemName)
-    sleep(1)
+    time.sleep(random.uniform(0.8, 1.2))
     setAmount(screenshot, itemQuantity)
-    sleep(1)
+    time.sleep(random.uniform(0.8, 1.2))
     confirmBuyItem(screenshot)
-    sleep(1)
+    time.sleep(random.uniform(0.8, 1.2))
     clearSearchBox(screenshot)
-    sleep(1)
+    time.sleep(random.uniform(0.8, 1.2))
