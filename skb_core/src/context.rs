@@ -69,8 +69,11 @@ impl AppContext {
         let mut numbers_hashes = HashMap::new();
         info!("Generating number hashes...");
         for i in 0..=9 {
-            let template_name = format!("digit_{}", i);
+            let template_name = format!("digits/digit_{}", i); // Changed path
+            let full_template_path = format!("{}/{}", templates_dir, template_name); // For logging
+            debug!("Attempting to load number template: '{}' from path: '{}'", template_name, full_template_path);
             if let Some(template) = template_manager.get_template(&template_name) {
+                debug!("Found number template: '{}'. Processing...", template_name);
                 // Convert DynamicImage to Luma8 for processing
                 let luma_image = template.image.to_luma8();
                 let image_data = luma_image.as_raw();
@@ -90,12 +93,12 @@ impl AppContext {
                 ) {
                     let hash = hash_utils::hashit_rust(&processed_region_data);
                     numbers_hashes.insert(hash, i);
-                    debug!("Generated hash {} for number template '{}' (value {}).", hash, template_name, i);
+                    debug!("Generated hash {} for number template '{}' (mapped to value {}). Path: '{}'", hash, template_name, i, full_template_path);
                 } else {
-                    warn!("Failed to process template data for number hash generation: {}", template_name);
+                    warn!("Failed to process template data for number hash generation: {}. Path: '{}'", template_name, full_template_path);
                 }
             } else {
-                warn!("Template not found for number hash generation: {}", template_name);
+                warn!("Template not found for number hash generation: {}. Expected at path: '{}'", template_name, full_template_path);
             }
         }
         info!("Number hashes generation complete. {} hashes generated.", numbers_hashes.len());
@@ -103,9 +106,12 @@ impl AppContext {
         // Generate minutes_or_hours_hashes (using same digit templates but different processing)
         let mut minutes_or_hours_hashes = HashMap::new();
         info!("Generating time hashes (minutes/hours)...");
-        for i in 0..=9 { // Assuming time digits also use "digit_0" to "digit_9" templates
-            let template_name = format!("digit_{}", i); // Or a different prefix like "time_" if they exist
+        for i in 0..=9 { // Assuming time digits also use "digits/digit_0" to "digits/digit_9" templates
+            let template_name = format!("digits/digit_{}", i); // Changed path
+            let full_template_path = format!("{}/{}", templates_dir, template_name); // For logging
+            debug!("Attempting to load time template: '{}' from path: '{}'", template_name, full_template_path);
             if let Some(template) = template_manager.get_template(&template_name) {
+                debug!("Found time template: '{}'. Processing...", template_name);
                 let luma_image = template.image.to_luma8();
                 let image_data = luma_image.as_raw();
                 let (image_width, image_height) = luma_image.dimensions();
@@ -124,12 +130,12 @@ impl AppContext {
                 ) {
                     let hash = hash_utils::hashit_rust(&processed_region_data);
                     minutes_or_hours_hashes.insert(hash, i);
-                     debug!("Generated hash {} for time template '{}' (value {}).", hash, template_name, i);
+                     debug!("Generated hash {} for time template '{}' (mapped to value {}). Path: '{}'", hash, template_name, i, full_template_path);
                 } else {
-                    warn!("Failed to process template data for time hash generation: {}", template_name);
+                    warn!("Failed to process template data for time hash generation: {}. Path: '{}'", template_name, full_template_path);
                 }
             } else {
-                warn!("Template not found for time hash generation: {}", template_name);
+                warn!("Template not found for time hash generation: {}. Expected at path: '{}'", template_name, full_template_path);
             }
         }
         info!("Time hashes generation complete. {} hashes generated.", minutes_or_hours_hashes.len());
@@ -139,25 +145,27 @@ impl AppContext {
         info!("Generating cooldown hashes...");
         // These keys should match the `area_key` used in `check_specific_cooldown_rust`
         // and the template file names (e.g., "attack.png", "healing.png", "support.png").
-        let cooldown_area_keys = ["attack", "healing", "support"];
+        // Template files are expected to be directly in templates_dir, e.g., "templates/attack.png"
+        let cooldown_template_names = ["attack", "healing", "support"]; // These are the base names, e.g., attack.png
 
-        for area_key in cooldown_area_keys.iter() {
-            // Assuming template name matches the area_key directly, e.g., "attack" for cooldown_attack state.
-            // Or, if templates are named "cooldown_attack.png", then format!("cooldown_{}", area_key)
-            let template_name = area_key.to_string(); // Use area_key directly as template name for now.
-                                                     // Adjust if template names have prefixes/suffixes like "cooldown_".
+        for template_base_name in cooldown_template_names.iter() {
+            // Template name for lookup in TemplateManager (key is filename without extension, e.g., "attack")
+            let template_key = template_base_name.to_string();
+            // Actual file name would be like "attack.png", TemplateManager handles stripping extension for the key.
+            // So, full_template_path for logging should reflect potential file name.
+            let full_template_path = format!("{}/{}.png", templates_dir, template_base_name); // Example with .png
 
-            if let Some(template) = template_manager.get_template(&template_name) {
-                let luma_image = template.image.to_luma8(); // Cooldown images are likely simple, Luma8 is fine.
+            debug!("Attempting to load cooldown template key: '{}' (expected file like '{}')", template_key, full_template_path);
+
+            if let Some(template) = template_manager.get_template(&template_key) {
+                debug!("Found cooldown template: '{}'. Processing...", template_key);
+                let luma_image = template.image.to_luma8();
                 let image_data = luma_image.as_raw();
-                // For cooldown hashes, we typically don't need complex pixel processing,
-                // just the raw hash of the template image representing the "on cooldown" state.
-                // So, we pass the raw image data directly to hashit_rust without extract_and_process_region.
                 let hash = hash_utils::hashit_rust(image_data);
-                cooldown_hashes.insert(hash, area_key.to_string());
-                debug!("Generated hash {} for cooldown template '{}'.", hash, template_name);
+                cooldown_hashes.insert(hash, template_key.clone()); // area_key is template_key here
+                debug!("Generated hash {} for cooldown template key '{}' (mapped to area_key '{}'). Path: '{}'", hash, template_key, template_key, full_template_path);
             } else {
-                warn!("Template not found for cooldown hash generation: {}", template_name);
+                warn!("Template not found for cooldown hash generation: key '{}'. Expected file like '{}'", template_key, full_template_path);
             }
         }
         info!("Cooldown hashes generation complete. {} hashes generated.", cooldown_hashes.len());

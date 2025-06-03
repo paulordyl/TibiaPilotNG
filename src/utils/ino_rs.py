@@ -1,117 +1,123 @@
-import ctypes
-import base64
-import os # For path joining
+# import ctypes # No longer needed
+# import base64 # No longer needed for send, Rust side handles it
+# import os # No longer needed for library path
+
+# Attempt to import the PyO3 module.
+# This assumes `skb_core` is installed in the Python environment
+# (e.g., via `maturin develop` or `pip install .` from the skb_core directory)
+# and that the library name in skb_core/Cargo.toml's [lib] section
+# makes `rust_utils_module` available under `skb_core`.
+try:
+    from skb_core import rust_utils_module
+except ImportError as e:
+    # Provide a more informative error message if the module can't be found.
+    # This helps users diagnose if skb_core isn't compiled or installed correctly.
+    raise ImportError(
+        "Failed to import 'rust_utils_module' from 'skb_core'. "
+        "Ensure the skb_core Rust library is compiled and installed in your Python environment. "
+        f"Original error: {e}"
+    )
 
 class ArduinoCommError(Exception):
     """Custom exception for ArduinoComm errors."""
     pass
 
 class ArduinoComm:
-    def __init__(self, port: str, library_path: str = './libarduino_comm.so'):
+    def __init__(self, port: str, baud_rate: int):
         """
-        Initializes the Arduino communication interface by loading the Rust shared library
-        and initializing the serial connection.
+        Initializes the Arduino communication interface by calling the PyO3 function
+        from the skb_core Rust library.
 
         Args:
             port (str): The serial port name (e.g., "COM33", "/dev/ttyACM0").
-            library_path (str): Path to the compiled Rust shared library.
-                                Defaults to './libarduino_comm.so'.
+            baud_rate (int): The baud rate for the serial connection.
         """
+        self.port = port
+        self.baud_rate = baud_rate
+        self.closed = True # Start as closed, successful init will open it
+
         try:
-            # Determine absolute path to library for more robust loading
-            # Assumes the library might be relative to this file's directory or project root.
-            # For now, let's try a common convention: place library in project root or a 'lib' folder.
-            # This path might need to be made more configurable or discoverable in a real app.
-            if not os.path.isabs(library_path):
-                # Try relative to project root (assuming utils is one level down)
-                base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-                abs_library_path = os.path.join(base_dir, library_path.lstrip('./'))
-                if not os.path.exists(abs_library_path) and library_path.startswith('./'):
-                    # Fallback: try relative to current file (if library is in src/utils/)
-                     abs_library_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), library_path.lstrip('./'))
-
-            else:
-                abs_library_path = library_path
-            
-            if not os.path.exists(abs_library_path):
-                raise ArduinoCommError(f"Shared library not found at resolved path: {abs_library_path}. Original path: {library_path}")
-
-            self.lib = ctypes.CDLL(abs_library_path)
-        except OSError as e:
-            raise ArduinoCommError(f"Failed to load ArduinoComm shared library from {abs_library_path}: {e}")
-
-        self._setup_ffi_signatures()
-
-        self.port_handle = self.lib.init_serial(port.encode('utf-8'))
-        if not self.port_handle:
-            raise ArduinoCommError(f"Failed to initialize serial port '{port}' via Rust FFI.")
-        
-        self.closed = False
-
-    def _setup_ffi_signatures(self):
-        """Sets up the FFI argtypes and restypes for the Rust functions."""
-        # init_serial(port_name: *const c_char) -> *mut SerialHandle
-        self.lib.init_serial.argtypes = [ctypes.c_char_p]
-        self.lib.init_serial.restype = ctypes.c_void_p  # Opaque handle
-
-        # send_command(ptr: *mut SerialHandle, b64_msg: *const c_char)
-        self.lib.send_command.argtypes = [ctypes.c_void_p, ctypes.c_char_p]
-        self.lib.send_command.restype = None # Assuming Rust returns nothing or handles errors internally
-
-        # close_serial(ptr: *mut SerialHandle)
-        self.lib.close_serial.argtypes = [ctypes.c_void_p]
-        self.lib.close_serial.restype = None
+            rust_utils_module.arduino_init(self.port, self.baud_rate)
+            self.closed = False # Mark as open if init succeeds
+        except Exception as e: # Catching a broad exception as PyO3 errors can vary
+            raise ArduinoCommError(f"Failed to initialize Arduino on port '{self.port}' with baud rate {self.baud_rate}: {e}")
 
     def send(self, raw_command_data: str):
         """
-        Encodes a raw command string to base64, appends a newline, 
-        and sends it to the Arduino via the Rust FFI.
+        Sends a raw command string to the Arduino via the PyO3 Rust function.
+        Base64 encoding and newline addition are handled by the Rust side.
 
         Args:
             raw_command_data (str): The raw command string (e.g., "keyDown,65").
         """
-        if self.closed or not self.port_handle:
+        if self.closed:
             raise ArduinoCommError("Serial port is not initialized or has been closed.")
 
-        command_bytes = raw_command_data.encode('utf-8')
-        command_base64 = base64.b64encode(command_bytes)
-        # Append newline as the original ino.py did to the base64 string before final encoding
-        # The Rust FFI `send_command` expects a C string (char*), so send bytes.
-        final_command_string_for_rust = command_base64.decode('utf-8') + '\n'
-        
-        self.lib.send_command(self.port_handle, final_command_string_for_rust.encode('utf-8'))
-        # Original ino.py had a sleep(0.01) after write. If this is still needed,
-        # the Rust send_command should handle it, or we add it here.
-        # For now, assuming Rust handles necessary delays.
+        try:
+            rust_utils_module.arduino_send_command(raw_command_data)
+        except Exception as e:
+            raise ArduinoCommError(f"Failed to send command '{raw_command_data}': {e}")
 
     def close(self):
-        """Closes the serial connection via the Rust FFI."""
-        if not self.closed and self.port_handle:
+        """Closes the serial connection via the PyO3 Rust function."""
+        if not self.closed:
             try:
-                if hasattr(self.lib, 'close_serial'): # Check if function exists before calling
-                    self.lib.close_serial(self.port_handle)
-            finally: # Ensure Python side state is updated even if Rust call fails
-                self.port_handle = None 
+                rust_utils_module.arduino_close()
+            except Exception as e:
+                # Log or handle error during close, but still mark as closed
+                # For example, print(f"Error during Arduino close: {e}")
+                # Depending on desired behavior, this might not need to raise ArduinoCommError
+                # if the primary goal is to ensure the Python state reflects 'closed'.
+                pass
+            finally:
                 self.closed = True
-        elif self.closed:
-            # Optionally log or silently ignore if already closed
-            pass
-
+        # If already closed, do nothing.
 
     def __del__(self):
         """Ensures the serial port is closed when the object is garbage collected."""
-        self.close()
+        # This will call self.close(), which now calls the PyO3 function.
+        # It's important that rust_utils_module.arduino_close() is safe to call
+        # even if the connection was already closed or never opened from Python's perspective,
+        # or if AppContext in Rust is gone (though __del__ timing is tricky).
+        # The Rust `arduino_close` is designed to be idempotent.
+        if not self.closed:
+            try:
+                self.close()
+            except Exception:
+                # Suppress errors during __del__ as it can cause issues if an error occurs
+                # while the interpreter is shutting down or an object is being finalized.
+                pass
 
 # Example usage (for testing this file directly, if needed):
 # if __name__ == '__main__':
+#     # This example requires skb_core to be compiled and importable,
+#     # and a real or mock Arduino on the specified port.
+#     TEST_PORT = "COM_TEST"  # Replace with your actual or test port
+#     TEST_BAUD_RATE = 9600
 #     try:
-#         # Adjust port and library path as necessary for your system
-#         # Ensure libarduino_comm.so (or .dll/.dylib) is compiled and in the specified path
-#         comm = ArduinoComm("COM3_TEST", library_path='./libarduino_comm.so') 
-#         print(f"Successfully initialized Arduino on COM3_TEST with handle {comm.port_handle}")
+#         print(f"Attempting to initialize Arduino on {TEST_PORT} at {TEST_BAUD_RATE} baud...")
+#         comm = ArduinoComm(port=TEST_PORT, baud_rate=TEST_BAUD_RATE)
+#         print(f"Successfully initialized Arduino on {TEST_PORT}")
+#
+#         print("Sending 'testCommand,123'...")
 #         comm.send("testCommand,123")
 #         print("Sent 'testCommand,123'")
+#
+#         print("Closing Arduino connection...")
 #         comm.close()
 #         print("Closed Arduino connection.")
+#
+#         print("\nTesting re-initialization (should be possible):")
+#         comm2 = ArduinoComm(port=TEST_PORT, baud_rate=TEST_BAUD_RATE)
+#         print(f"Successfully re-initialized Arduino on {TEST_PORT}")
+#         comm2.send("anotherCommand,456")
+#         print("Sent 'anotherCommand,456'")
+#         comm2.close()
+#         print("Closed second Arduino connection.")
+#
 #     except ArduinoCommError as e:
-#         print(f"Error: {e}")
+#         print(f"Arduino Communication Error: {e}")
+#     except ImportError as e:
+#         print(f"Import Error: {e}")
+#     except Exception as e:
+#         print(f"An unexpected error occurred: {e}")

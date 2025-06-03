@@ -30,11 +30,11 @@ impl TemplateManager {
     /// The name of the template is derived from its filename without the extension.
     /// Example: "path/to/my_button.png" becomes "my_button".
     /// If multiple files have the same name (e.g., "a/button.png" and "b/button.png"),
-    /// the behavior is undefined (last one loaded might overwrite). Consider making names more unique if needed.
+    /// they will be stored with keys relative to `dir_path`, e.g., "a/button" and "b/button".
     pub fn load_templates_from_directory(&mut self, dir_path: &str) -> Result<(), AppError> {
         info!("Loading templates from directory: {}", dir_path);
-        let path = Path::new(dir_path);
-        if !path.is_dir() {
+        let base_path = Path::new(dir_path);
+        if !base_path.is_dir() {
             error!("Provided path is not a directory: {}", dir_path);
             return Err(AppError::ConfigError(format!(
                 "Provided path is not a directory: {}",
@@ -42,35 +42,52 @@ impl TemplateManager {
             )));
         }
 
-        self._load_recursive(&path)?;
+        self._load_recursive(base_path, base_path)?;
         info!("Finished loading {} templates.", self.templates.len());
         Ok(())
     }
 
-    fn _load_recursive(&mut self, current_path: &Path) -> Result<(), AppError> {
-        for entry in fs::read_dir(current_path).map_err(|e| {
-            AppError::TemplateError(format!("Failed to read directory {}: {}", current_path.display(), e))
+    fn _load_recursive(&mut self, base_dir: &Path, current_dir: &Path) -> Result<(), AppError> {
+        for entry in fs::read_dir(current_dir).map_err(|e| {
+            AppError::TemplateError(format!("Failed to read directory {}: {}", current_dir.display(), e))
         })? {
             let entry_path = entry.map_err(|e| AppError::TemplateError(format!("Failed to read directory entry: {}", e)))?.path();
+            debug!("Processing path: {:?}", entry_path);
             if entry_path.is_dir() {
-                self._load_recursive(&entry_path)?;
+                info!("Entering subdirectory: {:?}", entry_path);
+                self._load_recursive(base_dir, &entry_path)?;
             } else if entry_path.is_file() {
                 // Check for common image extensions
                 if let Some(ext) = entry_path.extension().and_then(|s| s.to_str()) {
                     match ext.to_lowercase().as_str() {
                         "png" | "jpg" | "jpeg" | "bmp" | "gif" => {
-                            // Use filename without extension as template name
-                            if let Some(stem) = entry_path.file_stem().and_then(|s| s.to_str()) {
-                                let template_name = stem.to_string();
-                                debug!("Attempting to load template: {} from {:?}", template_name, entry_path);
+                            // Construct relative path from base_dir to use as template name/key
+                            let relative_path = entry_path.strip_prefix(base_dir).map_err(|_| {
+                                AppError::TemplateError(format!(
+                                    "Failed to create relative path for {:?} based on {:?}",
+                                    entry_path, base_dir
+                                ))
+                            })?;
+
+                            if let Some(stem) = relative_path.file_stem().and_then(|s| s.to_str()) {
+                                // The key should include the relative directory structure
+                                let key_path = relative_path.parent().unwrap_or_else(|| Path::new(""));
+                                let template_key = key_path.join(stem).to_str().unwrap_or("").replace("\\", "/");
+
+                                if template_key.is_empty() {
+                                    error!("Generated empty template key for path: {:?}", entry_path);
+                                    continue;
+                                }
+
+                                debug!("Attempting to load template with key: {} from {:?}", template_key, entry_path);
                                 match ImageReader::open(&entry_path)?.decode() {
                                     Ok(image) => {
                                         let template = Template {
-                                            name: template_name.clone(),
+                                            name: template_key.clone(), // Store the relative path key as its name
                                             image,
                                         };
-                                        self.templates.insert(template_name.clone(), template);
-                                        debug!("Successfully loaded template: {}", template_name);
+                                        self.templates.insert(template_key.clone(), template);
+                                        debug!("Successfully loaded template with key: {}", template_key);
                                     }
                                     Err(e) => {
                                         error!("Failed to decode image {:?}: {}", entry_path, e);

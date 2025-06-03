@@ -4,6 +4,8 @@ use numpy::{PyArrayDyn, PyReadonlyArrayDyn, PyArray2, PyReadonlyArray2, PyReadon
 use image::{DynamicImage, ImageBuffer, Rgb, Rgba, Luma, ImageError, GenericImageView, Luma as ImageLuma}; // Added ImageLuma for GrayImage
 use std::path::Path;
 use std::ffi::CStr; // For Tesseract lang string
+use numpy::ndarray::{ArrayView, Ix2 as NpIx2}; // Renamed Ix2 to avoid conflict if DynamicImage uses its own Ix2. Using NpIx2 for numpy's.
+use std::collections::HashMap as StdHashMap; // Renamed to avoid conflict if other HashMaps are used.
 
 // Assuming rustesseract is added to Cargo.toml
 // For example: rustesseract = "0.8"
@@ -16,7 +18,7 @@ use image::GrayImage; // Specific type for grayscale
 
 // Assuming skb_core::AppError is defined in the crate root (e.g., src/lib.rs or a specific error module)
 // For this file to compile correctly, `crate::AppError` must be resolvable.
-use crate::AppError;
+// use crate::AppError; // Already defined below, near release_keys
 // If AppError is in a sub-module like `crate::errors::AppError`, adjust the path.
 // Example placeholder for AppError if not available directly via `crate::AppError`
 // #[derive(Debug)] pub enum AppError { ImageProcessingError(String), IoError(std::io::Error), Other(String), ConfigError(String) }
@@ -337,9 +339,302 @@ fn coordinates_are_equal(first_coordinate: (i32, i32, i32), second_coordinate: (
     first_coordinate == second_coordinate
 }
 
-use pyo3::exceptions::PyIOError; // Added for error handling
+// --- Merged from py_rust_utils ---
+
+// Helper function `get_hashed_value`
+// Note: This function is adapted to use AppContext for filter parameters.
+// It also calls functions from `skb_core::image_processing::hash_utils`.
+fn get_hashed_value(
+    screenshot_view: &ArrayView<u8, NpIx2>,
+    base_x: i32,
+    base_y: i32,
+    img_slice_x_offset: i32,
+    img_slice_width: usize,
+    img_slice_height: usize,
+    hashes_map: &StdHashMap<i64, i32>, // Now passed from AppContext fields
+    is_value_type: bool,
+) -> i32 { // Changed PyResult<i32> to i32, error handling to be managed by caller or via AppContext access
+    let final_x = base_x.saturating_add(img_slice_x_offset);
+    let final_y = base_y;
+
+    if final_x < 0 || final_y < 0 {
+        return 0;
+    }
+
+    let raw_data_slice = match screenshot_view.as_slice_memory_order() {
+        Some(slice) => slice,
+        None => {
+            // This case should ideally not happen if data from numpy is contiguous.
+            // Consider logging an error or returning a specific error code if this function could return PyResult.
+            // For now, returning 0 as per original logic's tendency for default values on error.
+            // eprintln!("Screenshot data is not contiguous in get_hashed_value");
+            return 0;
+        }
+    };
+    let image_height_u32 = screenshot_view.shape()[0] as u32;
+    let image_width_u32 = screenshot_view.shape()[1] as u32;
+
+    // Access AppContext for filter parameters
+    // global_app_context() returns Result<Arc<AppContext>, AppError>
+    // This internal function should not return PyErr directly.
+    // If AppContext is critical and unavailable, it's a systemic issue.
+    // Propagating error with a specific type or panic might be options.
+    // For now, assume AppContext is available or error converted by calling FFI.
+    let app_context = match crate::global_app_context() {
+        Ok(ctx) => ctx,
+        Err(_) => {
+            // eprintln!("AppContext not initialized in get_hashed_value. This should be ensured by calling FFI functions.");
+            return 0; // Or handle error more explicitly
+        }
+    };
+
+    let filter_params = if is_value_type {
+        &app_context.config.value_type_filter_params
+    } else {
+        &app_context.config.non_value_type_filter_params
+    };
+
+    let region_data = crate::image_processing::hash_utils::extract_and_process_region(
+        raw_data_slice,
+        image_width_u32,
+        image_height_u32,
+        final_x as usize,
+        final_y as usize,
+        img_slice_width,
+        img_slice_height,
+        is_value_type,
+        filter_params.filter_range_low,
+        filter_params.filter_range_high,
+        filter_params.value_to_filter_to_zero_for_range,
+        filter_params.val_is_126,
+        filter_params.val_is_192,
+        filter_params.val_to_assign_if_126_or_192,
+        filter_params.val_else_filter_to_zero
+    );
+
+    if let Some(data) = region_data {
+        if data.is_empty() {
+            return 0;
+        }
+        let hash = crate::image_processing::hash_utils::hashit_rust(&data);
+        *hashes_map.get(&hash).unwrap_or(&0)
+    } else {
+        0
+    }
+}
+
+
+#[pyfunction]
+#[pyo3(signature = (screenshot, skills_icon_bbox))]
+fn get_hp_rust(
+    screenshot: PyReadonlyArray2<u8>,
+    skills_icon_bbox: Option<(i32, i32, i32, i32)>,
+) -> PyResult<Option<i32>> {
+    let app_context = crate::global_app_context().map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(format!("Failed to get AppContext: {}", e)))?;
+    if skills_icon_bbox.is_none() { return Ok(None); }
+    let bbox = skills_icon_bbox.unwrap();
+    let icon_x = bbox.0;
+    let icon_y = bbox.1;
+    let base_x = icon_x + 6;
+    let base_y = icon_y + 90;
+    let screenshot_view = screenshot.as_array();
+    let hundreds_val = get_hashed_value(&screenshot_view, base_x, base_y, 122, 22, 8, &app_context.numbers_hashes, true);
+    let thousands_val = get_hashed_value(&screenshot_view, base_x, base_y, 94, 22, 8, &app_context.numbers_hashes, true);
+    Ok(Some((thousands_val * 1000) + hundreds_val))
+}
+
+#[pyfunction]
+#[pyo3(signature = (screenshot, skills_icon_bbox))]
+fn get_mana_rust(
+    screenshot: PyReadonlyArray2<u8>,
+    skills_icon_bbox: Option<(i32, i32, i32, i32)>,
+) -> PyResult<Option<i32>> {
+    let app_context = crate::global_app_context().map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(format!("Failed to get AppContext: {}", e)))?;
+    if skills_icon_bbox.is_none() { return Ok(None); }
+    let bbox = skills_icon_bbox.unwrap();
+    let base_x = bbox.0 + 6;
+    let base_y = bbox.1 + 104;
+    let screenshot_view = screenshot.as_array();
+    let hundreds_val = get_hashed_value(&screenshot_view, base_x, base_y, 122, 22, 8, &app_context.numbers_hashes, true);
+    let thousands_val = get_hashed_value(&screenshot_view, base_x, base_y, 94, 22, 8, &app_context.numbers_hashes, true);
+    Ok(Some((thousands_val * 1000) + hundreds_val))
+}
+
+#[pyfunction]
+#[pyo3(signature = (screenshot, skills_icon_bbox))]
+fn get_capacity_rust(
+    screenshot: PyReadonlyArray2<u8>,
+    skills_icon_bbox: Option<(i32, i32, i32, i32)>,
+) -> PyResult<Option<i32>> {
+    let app_context = crate::global_app_context().map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(format!("Failed to get AppContext: {}", e)))?;
+    if skills_icon_bbox.is_none() { return Ok(None); }
+    let bbox = skills_icon_bbox.unwrap();
+    let base_x = bbox.0 + 6;
+    let base_y = bbox.1 + 132;
+    let screenshot_view = screenshot.as_array();
+    let hundreds_val = get_hashed_value(&screenshot_view, base_x, base_y, 122, 22, 8, &app_context.numbers_hashes, true);
+    let thousands_val = get_hashed_value(&screenshot_view, base_x, base_y, 94, 22, 8, &app_context.numbers_hashes, true);
+    Ok(Some((thousands_val * 1000) + hundreds_val))
+}
+
+#[pyfunction]
+#[pyo3(signature = (screenshot, skills_icon_bbox))]
+fn get_speed_rust(
+    screenshot: PyReadonlyArray2<u8>,
+    skills_icon_bbox: Option<(i32, i32, i32, i32)>,
+) -> PyResult<Option<i32>> {
+    let app_context = crate::global_app_context().map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(format!("Failed to get AppContext: {}", e)))?;
+    if skills_icon_bbox.is_none() { return Ok(None); }
+    let bbox = skills_icon_bbox.unwrap();
+    let base_x = bbox.0 + 6;
+    let base_y = bbox.1 + 146;
+    let screenshot_view = screenshot.as_array();
+    let hundreds_val = get_hashed_value(&screenshot_view, base_x, base_y, 122, 22, 8, &app_context.numbers_hashes, true);
+    let thousands_val = get_hashed_value(&screenshot_view, base_x, base_y, 94, 22, 8, &app_context.numbers_hashes, true);
+    Ok(Some((thousands_val * 1000) + hundreds_val))
+}
+
+#[pyfunction]
+#[pyo3(signature = (screenshot, skills_icon_bbox))]
+fn get_food_rust(
+    screenshot: PyReadonlyArray2<u8>,
+    skills_icon_bbox: Option<(i32, i32, i32, i32)>,
+) -> PyResult<Option<i32>> {
+    let app_context = crate::global_app_context().map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(format!("Failed to get AppContext: {}", e)))?;
+    if skills_icon_bbox.is_none() { return Ok(None); }
+    let bbox = skills_icon_bbox.unwrap();
+    let base_x = bbox.0 + 6;
+    let base_y = bbox.1 + 160;
+    let screenshot_view = screenshot.as_array();
+    let minutes_val = get_hashed_value(&screenshot_view, base_x, base_y, 130, 14, 8, &app_context.minutes_or_hours_hashes, false);
+    let hours_val = get_hashed_value(&screenshot_view, base_x, base_y, 110, 14, 8, &app_context.minutes_or_hours_hashes, false);
+    Ok(Some((hours_val * 60) + minutes_val))
+}
+
+#[pyfunction]
+#[pyo3(signature = (screenshot, skills_icon_bbox))]
+fn get_stamina_rust(
+    screenshot: PyReadonlyArray2<u8>,
+    skills_icon_bbox: Option<(i32, i32, i32, i32)>,
+) -> PyResult<Option<i32>> {
+    let app_context = crate::global_app_context().map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(format!("Failed to get AppContext: {}", e)))?;
+    if skills_icon_bbox.is_none() { return Ok(None); }
+    let bbox = skills_icon_bbox.unwrap();
+    let base_x = bbox.0 + 6;
+    let base_y = bbox.1 + 174;
+    let screenshot_view = screenshot.as_array();
+    let minutes_val = get_hashed_value(&screenshot_view, base_x, base_y, 130, 14, 8, &app_context.minutes_or_hours_hashes, false);
+    let hours_val = get_hashed_value(&screenshot_view, base_x, base_y, 110, 14, 8, &app_context.minutes_or_hours_hashes, false);
+    Ok(Some((hours_val * 60) + minutes_val))
+}
+
+#[pyfunction]
+#[pyo3(signature = (cooldowns_image, area_key))]
+fn check_specific_cooldown_rust(
+    cooldowns_image: PyReadonlyArray2<u8>,
+    area_key: String,
+) -> PyResult<bool> {
+    let app_context = crate::global_app_context().map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(format!("Failed to get AppContext: {}", e)))?;
+    let view = cooldowns_image.as_array();
+    let (y_start, y_end, x_start, x_end) = match area_key.as_str() {
+        "attack" => (0, 20, 4, 24),
+        "healing" => (0, 20, 29, 49),
+        "support" => (0, 20, 54, 74),
+        _ => return Ok(false),
+    };
+
+    if y_end > view.shape()[0] || x_end > view.shape()[1] {
+        return Ok(false);
+    }
+
+    let mut region_data = Vec::with_capacity((y_end - y_start) * (x_end - x_start));
+    for r in y_start..y_end {
+        for c in x_start..x_end {
+            region_data.push(view[(r,c)]);
+        }
+    }
+
+    let hash = crate::image_processing::hash_utils::hashit_rust(&region_data);
+
+    if let Some(hash_area_key_from_map) = app_context.cooldown_hashes.get(&hash) {
+        if *hash_area_key_from_map == area_key {
+            return Ok(true);
+        }
+    }
+    Ok(false)
+}
+
+#[pyfunction]
+#[pyo3(signature = (screenshot, left_arrows_x, left_arrows_y, left_arrows_width, slot, expected_pixel_value))]
+fn is_action_bar_slot_equipped_rust(
+    screenshot: PyReadonlyArray2<u8>,
+    left_arrows_x: i32,
+    left_arrows_y: i32,
+    left_arrows_width: i32,
+    slot: u32,
+    expected_pixel_value: u8,
+) -> PyResult<bool> {
+    if slot == 0 { return Ok(false); }
+    let slot_i32 = slot as i32;
+    let x0 = left_arrows_x + left_arrows_width + (slot_i32 * 2) + ((slot_i32 - 1) * 34);
+    let y = left_arrows_y;
+
+    let view = screenshot.as_array();
+
+    if y < 0 || x0 < 0 { return Ok(false); }
+    let y_usize = y as usize;
+    let x_usize = x0 as usize;
+
+    if y_usize >= view.shape()[0] || x_usize >= view.shape()[1] {
+        return Ok(false);
+    }
+
+    Ok(view[(y_usize, x_usize)] == expected_pixel_value)
+}
+
+#[pyfunction]
+#[pyo3(signature = (screenshot, left_arrows_x, left_arrows_y, left_arrows_width, slot, expected_pixel_value_for_unavailable))]
+fn is_action_bar_slot_available_rust(
+    screenshot: PyReadonlyArray2<u8>,
+    left_arrows_x: i32,
+    left_arrows_y: i32,
+    left_arrows_width: i32,
+    slot: u32,
+    expected_pixel_value_for_unavailable: u8,
+) -> PyResult<bool> {
+    if slot == 0 { return Ok(true); }
+    let slot_i32 = slot as i32;
+    let x0 = left_arrows_x + left_arrows_width + (slot_i32 * 2) + ((slot_i32 - 1) * 34);
+    let check_y = left_arrows_y + 1;
+
+    if check_y < 0 || x0 < 0 { return Ok(true); }
+    let check_y_usize = check_y as usize;
+
+    let view = screenshot.as_array();
+    let check_x_coords = [x0 + 2, x0 + 4, x0 + 6, x0 + 8, x0 + 10];
+
+    for check_x_offset in check_x_coords.iter() {
+        let check_x = *check_x_offset;
+        if check_x < 0 { return Ok(true); }
+
+        let check_x_usize = check_x as usize;
+
+        if check_y_usize >= view.shape()[0] || check_x_usize >= view.shape()[1] {
+            return Ok(true);
+        }
+        if view[(check_y_usize, check_x_usize)] != expected_pixel_value_for_unavailable {
+            return Ok(true);
+        }
+    }
+    Ok(false)
+}
+// --- End of Merged from py_rust_utils ---
+
+
+use pyo3::exceptions::{PyIOError, PyRuntimeError}; // Added PyRuntimeError
 use crate::global_app_context; // To access the global AppContext
 use crate::AppError; // To map AppError to PyErr
+use crate::input::arduino::ArduinoCom; // For Arduino functions
 
 #[pyfunction]
 fn release_keys(_py: Python, last_pressed_key: Option<String>) -> PyResult<Option<String>> {
@@ -404,7 +699,132 @@ fn rust_utils_module(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(get_speed, m)?)?;
     m.add_function(wrap_pyfunction!(get_food, m)?)?;
     m.add_function(wrap_pyfunction!(get_stamina, m)?)?;
+
+    // Add merged functions
+    m.add_function(wrap_pyfunction!(get_hp_rust, m)?)?;
+    m.add_function(wrap_pyfunction!(get_mana_rust, m)?)?;
+    m.add_function(wrap_pyfunction!(get_capacity_rust, m)?)?;
+    m.add_function(wrap_pyfunction!(get_speed_rust, m)?)?;
+    m.add_function(wrap_pyfunction!(get_food_rust, m)?)?;
+    m.add_function(wrap_pyfunction!(get_stamina_rust, m)?)?;
+    m.add_function(wrap_pyfunction!(check_specific_cooldown_rust, m)?)?;
+    m.add_function(wrap_pyfunction!(is_action_bar_slot_equipped_rust, m)?)?;
+    m.add_function(wrap_pyfunction!(is_action_bar_slot_available_rust, m)?)?;
+
+    // Arduino functions
+    m.add_function(wrap_pyfunction!(arduino_init, m)?)?;
+    m.add_function(wrap_pyfunction!(arduino_send_command, m)?)?;
+    m.add_function(wrap_pyfunction!(arduino_close, m)?)?;
     Ok(())
+}
+
+// === Arduino Control Functions ===
+
+#[pyfunction]
+fn arduino_init(py: Python, port: String, baud_rate: u32) -> PyResult<()> {
+    py.allow_threads(|| {
+        let app_context = global_app_context()
+            .map_err(|e| PyRuntimeError::new_err(format!("Failed to get AppContext: {}", e)))?;
+
+        match ArduinoCom::new(&port, baud_rate) {
+            Ok(new_arduino_com) => {
+                let mut arduino_com_option_guard = app_context.arduino_com.lock()
+                    .map_err(|e| PyRuntimeError::new_err(format!("Failed to lock ArduinoCom Mutex: {}", e.toString())))?;
+                *arduino_com_option_guard = Some(new_arduino_com);
+                Ok(())
+            }
+            Err(e) => {
+                // Attempt to close any existing connection if initialization fails, then report error
+                let mut arduino_com_option_guard = app_context.arduino_com.lock()
+                    .map_err(|e_lock| PyRuntimeError::new_err(format!("Failed to lock ArduinoCom Mutex while handling init error: {}", e_lock.toString())))?;
+                *arduino_com_option_guard = None; // Drop existing instance, if any
+
+                Err(PyIOError::new_err(format!("Failed to initialize Arduino on port {}: {}", port, e)))
+            }
+        }
+    })
+}
+
+// === Battle List Processing Functions ===
+
+// Placeholder internal logic for counting filled slots
+fn count_filled_slots_internal_logic(_image: &GrayImage) -> i32 {
+    // Placeholder: In a real scenario, this would involve image analysis
+    // to detect how many battle list entries are present.
+    // For now, let's return a dummy value based on image height, e.g., height / 20 (assuming each slot is ~20px high)
+    // let (height, _width) = image.dimensions();
+    // height as i32 / 20
+    5 // Fixed placeholder
+}
+
+#[pyfunction]
+fn count_filled_slots(battle_list_content_array: PyReadonlyArray2<u8>) -> PyResult<i32> {
+    let gray_image = py_to_gray_image(battle_list_content_array)?;
+    let count = count_filled_slots_internal_logic(&gray_image);
+    Ok(count)
+}
+
+// Placeholder internal logic for determining attacked status
+fn determine_being_attacked_internal_logic(_image: &GrayImage, filled_slots_count: i32) -> Vec<bool> {
+    // Placeholder: In a real scenario, this would inspect each filled slot in the image
+    // for an attack indicator (e.g., red border).
+    // For now, returns a dummy pattern: e.g., first is true, rest are false.
+    if filled_slots_count <= 0 {
+        return vec![];
+    }
+    let mut results = vec![false; filled_slots_count as usize];
+    if filled_slots_count > 0 {
+        results[0] = true; // Example: first creature is being attacked
+    }
+    results
+}
+
+#[pyfunction]
+fn determine_being_attacked(battle_list_content_array: PyReadonlyArray2<u8>, filled_slots_count: i32) -> PyResult<Vec<bool>> {
+    if filled_slots_count < 0 {
+        return Err(PyRuntimeError::new_err("filled_slots_count cannot be negative."));
+    }
+    let gray_image = py_to_gray_image(battle_list_content_array)?;
+    let results = determine_being_attacked_internal_logic(&gray_image, filled_slots_count);
+    Ok(results)
+}
+
+#[pyfunction]
+fn arduino_send_command(py: Python, command: String) -> PyResult<()> {
+    py.allow_threads(|| {
+        let app_context = global_app_context()
+            .map_err(|e| PyRuntimeError::new_err(format!("Failed to get AppContext: {}", e)))?;
+
+        let mut arduino_com_option_guard = app_context.arduino_com.lock()
+            .map_err(|e| PyRuntimeError::new_err(format!("Failed to lock ArduinoCom Mutex: {}", e.toString())))?;
+
+        if let Some(arduino_com) = arduino_com_option_guard.as_mut() {
+            arduino_com.send_command(&command)
+                .map_err(|e| PyIOError::new_err(format!("Failed to send command '{}': {}", command, e)))
+        } else {
+            Err(PyIOError::new_err("Arduino communication is not initialized. Call arduino_init first."))
+        }
+    })
+}
+
+#[pyfunction]
+fn arduino_close(py: Python) -> PyResult<()> {
+    py.allow_threads(|| {
+        let app_context = global_app_context()
+            .map_err(|e| PyRuntimeError::new_err(format!("Failed to get AppContext: {}", e)))?;
+
+        let mut arduino_com_option_guard = app_context.arduino_com.lock()
+            .map_err(|e| PyRuntimeError::new_err(format!("Failed to lock ArduinoCom Mutex: {}", e.toString())))?;
+
+        if arduino_com_option_guard.is_some() {
+            *arduino_com_option_guard = None; // This will drop the ArduinoCom instance, closing the port.
+            Ok(())
+        } else {
+            // Optionally, inform that it was already closed or not initialized.
+            // For idempotency, returning Ok is fine.
+            Ok(())
+        }
+    })
 }
 
 // Notes for successful compilation as part of skb_core:

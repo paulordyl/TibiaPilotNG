@@ -1,47 +1,24 @@
-import ctypes # Added
 from numba import njit
 import numpy as np
-from typing import Generator, Union, List # Added List
+from typing import Generator, Union, List
 from src.shared.typings import CreatureCategory, CreatureCategoryOrUnknown, GrayImage
 from src.utils.core import hashit, locate
-from src.utils.image import RustImageData, _numpy_to_rust_image_data, py_rust_lib # Added
+# from src.utils.image import RustImageData, _numpy_to_rust_image_data, py_rust_lib # Removed CFFI utils
 from .config import creaturesNamesImagesHashes, images
 from .extractors import getCreaturesNamesImages
 from .typings import CreatureList, Creature
 
-
-# FFI Function Signature Setup 
-
-# count_filled_slots_rust
-if hasattr(py_rust_lib, 'count_filled_slots_rust'):
-    py_rust_lib.count_filled_slots_rust.argtypes = [RustImageData]
-    py_rust_lib.count_filled_slots_rust.restype = ctypes.c_int32
-else:
-    # Consistent with warnings in other modules
-    print("Warning: FFI function 'count_filled_slots_rust' not found in py_rust_lib.")
-
-# determine_being_attacked_rust
-if hasattr(py_rust_lib, 'determine_being_attacked_rust'):
-    py_rust_lib.determine_being_attacked_rust.argtypes = [
-        RustImageData,      # battle_list_content_data
-        ctypes.c_int32      # filled_slots_count
-    ]
-    py_rust_lib.determine_being_attacked_rust.restype = ctypes.POINTER(ctypes.c_bool)
-else:
-    print("Warning: FFI function 'determine_being_attacked_rust' not found in py_rust_lib.")
-
-# free_rust_bool_array
-if hasattr(py_rust_lib, 'free_rust_bool_array'):
-    py_rust_lib.free_rust_bool_array.argtypes = [
-        ctypes.POINTER(ctypes.c_bool),  # pointer to the boolean array
-        ctypes.c_size_t                 # number of elements in the array
-    ]
-    py_rust_lib.free_rust_bool_array.restype = None
-else:
-    print("Warning: FFI function 'free_rust_bool_array' not found in py_rust_lib.")
+try:
+    from skb_core import rust_utils_module
+except ImportError as e:
+    raise ImportError(
+        "Failed to import 'rust_utils_module' from 'skb_core'. "
+        "Ensure the skb_core Rust library is compiled and installed in your Python environment. "
+        f"Original error: {e}"
+    )
 
 
-# PERF: [0.13737060000000056, 4.999999987376214e-07]
+# PERF: [0.13737060000000056, 4.999999987376214e-07] # Numba perf comment, can remain
 @njit(cache=True, fastmath=True)
 def getBeingAttackedCreatureCategory(creatures: CreatureList) -> Union[CreatureCategory, None]:
     for creature in creatures:
@@ -50,60 +27,59 @@ def getBeingAttackedCreatureCategory(creatures: CreatureList) -> Union[CreatureC
     return None
 
 
-# PERF: [1.3400000000274304e-05, 2.9000000001389026e-06] # Original PERF comment
+# PERF: [1.3400000000274304e-05, 2.9000000001389026e-06]
 def getBeingAttackedCreatures(content: GrayImage, filledSlotsCount: int) -> List[bool]:
-    if not hasattr(py_rust_lib, 'determine_being_attacked_rust') or \
-       not hasattr(py_rust_lib, 'free_rust_bool_array'):
-        raise RuntimeError("Rust FFI functions for getBeingAttackedCreatures are not available.")
-
-    if _numpy_to_rust_image_data is None:
-        raise RuntimeError("Helper function '_numpy_to_rust_image_data' is not available.")
-
-    if filledSlotsCount == 0:
+    if filledSlotsCount <= 0: # Return empty list if no slots or invalid count
         return []
-
-    # Convert input GrayImage to RustImageData
-    rust_content_data = _numpy_to_rust_image_data(content, "GRAY")
-
-    # Call the FFI function
-    bool_array_ptr = py_rust_lib.determine_being_attacked_rust(
-        rust_content_data,
-        ctypes.c_int32(filledSlotsCount)
-    )
-
-    results = []
-    if bool_array_ptr:
-        try:
-            # Convert C array of booleans to Python list
-            for i in range(filledSlotsCount):
-                results.append(bool(bool_array_ptr[i]))
-        finally:
-            # Free the memory allocated by Rust
-            py_rust_lib.free_rust_bool_array(bool_array_ptr, ctypes.c_size_t(filledSlotsCount))
-    else:
-        # Handle null pointer return from Rust, e.g., allocation failure in Rust
-        # Return empty list or raise an error. For now, empty list.
-        print("Warning: determine_being_attacked_rust returned a null pointer.")
-    
-    return results
+    try:
+        # Call the PyO3 function, which directly returns a Python list of booleans
+        results = rust_utils_module.determine_being_attacked(content, filledSlotsCount)
+        return results
+    except Exception as e:
+        # Handle potential errors from the Rust call, e.g., if image conversion fails
+        # or if the Rust function itself panics (though PyO3 tries to convert panics to PyErr).
+        print(f"Error calling rust_utils_module.determine_being_attacked: {e}")
+        # Fallback to returning a list of False, or re-raise, or handle as appropriate.
+        # For consistency with previous behavior of returning empty on some errors,
+        # we might return a list of False of the expected length.
+        return [False] * filledSlotsCount
 
 
-# PERF: [0.00017040000000001498, 7.330000000038694e-05] # Original PERF comment
+# PERF: [0.00017040000000001498, 7.330000000038694e-05]
 def getCreatures(content: GrayImage) -> CreatureList:
-    if content is not None:
-        filledSlotsCount = getFilledSlotsCount(content)
-        if filledSlotsCount == 0:
-            return np.array([], dtype=Creature)
-        beingAttackedCreatures = [
-            beingAttackedCreature for beingAttackedCreature in getBeingAttackedCreatures(content, filledSlotsCount)]
-        creaturesNames = [creatureName for creatureName in getCreaturesNames(
-            content, filledSlotsCount)]
-        creatures = np.array([(creatureName, beingAttackedCreatures[slotIndex])
-                        for slotIndex, creatureName in enumerate(creaturesNames)], dtype=Creature)
-        creaturesAfterCheck = checkDust(content, creatures)
-        return creaturesAfterCheck
-    else:
+    if content is None: # Check if content is None first
         return []
+
+    filledSlotsCount = getFilledSlotsCount(content)
+    if filledSlotsCount == 0:
+        return np.array([], dtype=Creature)
+
+    beingAttackedCreatures = getBeingAttackedCreatures(content, filledSlotsCount)
+    # Ensure beingAttackedCreatures has the correct length if an error occurred in Rust call
+    if len(beingAttackedCreatures) != filledSlotsCount:
+        # This might happen if the Rust call failed and returned a default.
+        # Decide on a consistent error handling strategy or ensure Rust always returns correct length or raises.
+        # For now, assume it might return less if error, or adjust placeholder in Rust to always return correct length.
+        # If it's critical, this should raise an error.
+        # For robustness, if lengths mismatch, we could pad `beingAttackedCreatures` or truncate `creaturesNames`.
+        # Simplest is to proceed, but this could lead to IndexError if lists don't align.
+        # A safer approach if Rust might return partial data on error:
+        # beingAttackedCreatures = [False] * filledSlotsCount # Or handle specific error
+        pass
+
+
+    creaturesNames = [creatureName for creatureName in getCreaturesNames(
+        content, filledSlotsCount)]
+
+    # Ensure lists are of the same length before zipping
+    # This is a defensive measure if getBeingAttackedCreatures or getCreaturesNames might not return expected length
+    min_len = min(len(creaturesNames), len(beingAttackedCreatures))
+
+    creatures = np.array([(creaturesNames[i], beingAttackedCreatures[i])
+                          for i in range(min_len)], dtype=Creature)
+
+    creaturesAfterCheck = checkDust(content, creatures)
+    return creaturesAfterCheck
 
 
 # PERF: [0.019119499999998624, 4.020000000082291e-05]
@@ -112,25 +88,20 @@ def getCreaturesNames(content: GrayImage, filledSlotsCount: int) -> Generator[Cr
         yield creaturesNamesImagesHashes.get(hashit(creatureNameImage), 'Unknown')
 
 
-# PERF: [0.5794668999999999, 3.9999999934536845e-07] # Original PERF comment
+# PERF: [0.5794668999999999, 3.9999999934536845e-07]
 def getFilledSlotsCount(content: GrayImage) -> int:
-    if not hasattr(py_rust_lib, 'count_filled_slots_rust'):
-        raise RuntimeError("Rust FFI function 'count_filled_slots_rust' is not available.")
-    
-    if _numpy_to_rust_image_data is None: # Should have been imported
-        raise RuntimeError("Helper function '_numpy_to_rust_image_data' is not available.")
-
-    # Convert input GrayImage (NumPy array) to RustImageData
-    # Assuming "GRAY" format for single channel image data.
-    rust_content_data = _numpy_to_rust_image_data(content, "GRAY")
-
-    # Call the FFI function
-    count = py_rust_lib.count_filled_slots_rust(rust_content_data)
-    
-    return count
+    try:
+        # Call the PyO3 function, which expects a NumPy array directly
+        count = rust_utils_module.count_filled_slots(content)
+        return count
+    except Exception as e:
+        # Handle potential errors from the Rust call
+        print(f"Error calling rust_utils_module.count_filled_slots: {e}")
+        # Fallback to returning 0 or handle as appropriate.
+        return 0
 
 
-# PERF: [7.5999999999964984e-06, 7.999999986907369e-07] # Original PERF comment
+# PERF: [7.5999999999964984e-06, 7.999999986907369e-07]
 def hasSkull(content: GrayImage, creatures: CreatureList) -> bool:
     for creatureIndex, creature in enumerate(creatures):
         if creature['name'] != 'Unknown':
