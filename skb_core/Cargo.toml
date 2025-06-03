@@ -1,3 +1,5 @@
+[workspace] # Added to make this package standalone for compilation purposes
+
 [package]
 name = "skb"
 version = "0.1.0"
