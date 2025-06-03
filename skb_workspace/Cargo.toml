@@ -1,0 +1,14 @@
+[workspace]
+resolver = "2"
+members = [
+    "skb_config",
+    "skb_utils",
+    "skb_capture",
+    "skb_image_proc",
+    "skb_ocr",
+    "skb_input",
+]
+
+[workspace.dependencies]
+# Common dependencies can be listed here with versions later
+EOF

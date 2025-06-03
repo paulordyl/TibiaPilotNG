@@ -1,0 +1,10 @@
+[package]
+name = "skb_utils"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+log = "0.4"
+env_logger = "0.10" # Or consider tracing and tracing-subscriber
+thiserror = "1.0"
+EOF
