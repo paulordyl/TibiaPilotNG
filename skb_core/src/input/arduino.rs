@@ -57,24 +57,6 @@ impl ArduinoCom {
 }
 
 // Example of how to integrate AppError if it's defined in main.rs or lib.rs
-// This assumes AppError is accessible from crate::AppError
-// If AppError is in a different module, adjust the path accordingly.
-
-// Mock AppError for compilation if not available globally - remove this if AppError is globally accessible
-/*
-#[derive(Debug)]
-pub enum AppError {
-    InputError(String),
-    // Add other error variants as needed
-}
-
-impl std::fmt::Display for AppError {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        match self {
-            AppError::InputError(s) => write!(f, "Input Error: {}", s),
-        }
-    }
-}
-
-impl std::error::Error for AppError {}
-*/
+// This assumes AppError is accessible from crate::AppError which is defined in lib.rs.
+// If AppError were in a different module, the path would need adjustment.
+// The mock AppError definition has been removed as it's now defined in lib.rs.

@@ -25,3 +25,8 @@ opencv = { version = "0.70.0", features = ["imgproc", "highgui"] } # For image p
 serde = { version = "1.0", features = ["derive"] } # For serialization/deserialization
 toml = "0.8" # For TOML parsing
 pyo3 = { version = "0.21.0", features = ["extension-module"] }
+once_cell = "1.19" # For global static instance
+farmhash = "1.1" # For hashing image data
+
+[dev-dependencies]
+tempfile = "3"

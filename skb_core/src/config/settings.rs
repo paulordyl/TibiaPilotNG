@@ -37,12 +37,25 @@ pub struct PlayerStatusRegions {
     pub mp: ScreenRegion,
 }
 
-#[derive(Deserialize, Debug, Clone)] // Added Clone
+#[derive(Deserialize, Debug, Clone)]
+pub struct ImageFilterParameters {
+    pub filter_range_low: u8,
+    pub filter_range_high: u8,
+    pub value_to_filter_to_zero_for_range: u8,
+    pub val_is_126: u8,
+    pub val_is_192: u8,
+    pub val_to_assign_if_126_or_192: u8,
+    pub val_else_filter_to_zero: u8,
+}
+
+#[derive(Deserialize, Debug, Clone)]
 pub struct Config {
     pub general: GeneralSettings,
     pub arduino: ArduinoConfig,
     pub hotkeys: HotkeyConfig,
-    pub player_status_regions: PlayerStatusRegions, // Added player status regions
+    pub player_status_regions: PlayerStatusRegions,
+    pub value_type_filter_params: ImageFilterParameters,
+    pub non_value_type_filter_params: ImageFilterParameters,
 }
 
 /// Loads configuration from a TOML file.
@@ -67,7 +80,7 @@ pub fn load_config(file_path: &str) -> Result<Config, AppError> {
 
     let contents = fs::read_to_string(path).map_err(|e| {
         error!("Failed to read configuration file '{}': {}", file_path, e);
-        AppError::IOError(e) // Convert std::io::Error to AppError::IOError
+        AppError::ConfigError(format!("Failed to read configuration file '{}': {}", file_path, e))
     })?;
 
     let config: Config = toml::from_str(&contents).map_err(|e| {
@@ -110,3 +123,155 @@ impl From<std::io::Error> for AppError {
     }
 }
 */
+
+#[cfg(test)]
+mod tests {
+    use super::*; // To import load_config, Config, AppError, etc.
+    use tempfile::Builder;
+    use std::io::Write;
+
+    fn get_valid_toml_content() -> String {
+        r#"
+        [general]
+        character_name = "TestBot"
+        auto_login = true
+
+        [arduino]
+        port = "/dev/ttyACM0"
+        baud_rate = 115200
+
+        [hotkeys]
+        heal = "F1"
+        attack_spell = "F2"
+
+        [player_status_regions]
+            [player_status_regions.hp]
+            x = 10; y = 20; width = 100; height = 10
+            [player_status_regions.mp]
+            x = 10; y = 30; width = 100; height = 10
+
+        [value_type_filter_params]
+        filter_range_low = 50
+        filter_range_high = 100
+        value_to_filter_to_zero_for_range = 0
+        val_is_126 = 126
+        val_is_192 = 192
+        val_to_assign_if_126_or_192 = 192
+        val_else_filter_to_zero = 0
+
+        [non_value_type_filter_params]
+        filter_range_low = 50
+        filter_range_high = 100
+        value_to_filter_to_zero_for_range = 0
+        val_is_126 = 0
+        val_is_192 = 0
+        val_to_assign_if_126_or_192 = 0
+        val_else_filter_to_zero = 0
+        "#.to_string()
+    }
+
+    #[test]
+    fn test_load_config_valid() {
+        let toml_content = get_valid_toml_content();
+        let mut tmpfile = Builder::new().suffix(".toml").tempfile().unwrap();
+        tmpfile.write_all(toml_content.as_bytes()).unwrap();
+        let path_str = tmpfile.path().to_str().unwrap();
+
+        let config_result = load_config(path_str);
+        assert!(config_result.is_ok(), "load_config failed for valid TOML: {:?}", config_result.err());
+        let config = config_result.unwrap();
+
+        assert_eq!(config.general.character_name, "TestBot");
+        assert_eq!(config.general.auto_login, true);
+        assert_eq!(config.arduino.port, "/dev/ttyACM0");
+        assert_eq!(config.arduino.baud_rate, 115200);
+        assert_eq!(config.hotkeys.heal, "F1");
+        assert_eq!(config.player_status_regions.hp.x, 10);
+        assert_eq!(config.value_type_filter_params.filter_range_low, 50);
+        assert_eq!(config.non_value_type_filter_params.val_is_126, 0);
+    }
+
+    #[test]
+    fn test_load_config_missing_file() {
+        let result = load_config("a_non_existent_file.toml");
+        assert!(result.is_err());
+        match result.err().unwrap() {
+            AppError::ConfigError(msg) => assert!(msg.contains("Configuration file not found")),
+            _ => panic!("Expected ConfigError for missing file"),
+        }
+    }
+
+    #[test]
+    fn test_load_config_malformed_toml() {
+        let malformed_toml = "this is not valid toml content---";
+        let mut tmpfile = Builder::new().suffix(".toml").tempfile().unwrap();
+        tmpfile.write_all(malformed_toml.as_bytes()).unwrap();
+        let path_str = tmpfile.path().to_str().unwrap();
+
+        let result = load_config(path_str);
+        assert!(result.is_err());
+        match result.err().unwrap() {
+            AppError::ConfigError(msg) => assert!(msg.contains("Failed to parse TOML")),
+            _ => panic!("Expected ConfigError for malformed TOML"),
+        }
+    }
+
+    #[test]
+    fn test_load_config_missing_required_field() {
+        let incomplete_toml = r#"
+        [general]
+        # character_name = "TestBot" ; Missing this required field
+        auto_login = false
+
+        [arduino]
+        port = "/dev/ttyS0"
+        baud_rate = 9600
+
+        [hotkeys]
+        heal = "F1"
+        attack_spell = "F2"
+
+        [player_status_regions]
+            [player_status_regions.hp]
+            x = 10; y = 20; width = 100; height = 10
+            [player_status_regions.mp]
+            x = 10; y = 30; width = 100; height = 10
+
+        [value_type_filter_params]
+        filter_range_low = 50; filter_range_high = 100; value_to_filter_to_zero_for_range = 0;
+        val_is_126 = 126; val_is_192 = 192; val_to_assign_if_126_or_192 = 192; val_else_filter_to_zero = 0;
+
+        [non_value_type_filter_params]
+        filter_range_low = 50; filter_range_high = 100; value_to_filter_to_zero_for_range = 0;
+        val_is_126 = 0; val_is_192 = 0; val_to_assign_if_126_or_192 = 0; val_else_filter_to_zero = 0;
+        "#;
+        let mut tmpfile = Builder::new().suffix(".toml").tempfile().unwrap();
+        tmpfile.write_all(incomplete_toml.as_bytes()).unwrap();
+        let path_str = tmpfile.path().to_str().unwrap();
+
+        let result = load_config(path_str);
+        assert!(result.is_err());
+        match result.err().unwrap() {
+            AppError::ConfigError(msg) => {
+                // Serde's error for missing field is usually "missing field `field_name`"
+                assert!(msg.contains("missing field `character_name`") || msg.contains("Failed to parse TOML"));
+            }
+            _ => panic!("Expected ConfigError for missing required field"),
+        }
+    }
+
+    #[test]
+    fn test_load_config_empty_file() {
+        let empty_toml = "";
+        let mut tmpfile = Builder::new().suffix(".toml").tempfile().unwrap();
+        tmpfile.write_all(empty_toml.as_bytes()).unwrap();
+        let path_str = tmpfile.path().to_str().unwrap();
+
+        let result = load_config(path_str);
+        assert!(result.is_err());
+        match result.err().unwrap() {
+            AppError::ConfigError(msg) => assert!(msg.contains("Failed to parse TOML") || msg.contains("empty")), // Error msg might vary slightly
+            _ => panic!("Expected ConfigError for empty file"),
+        }
+    }
+}

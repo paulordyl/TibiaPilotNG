@@ -49,9 +49,9 @@ impl TemplateManager {
 
     fn _load_recursive(&mut self, current_path: &Path) -> Result<(), AppError> {
         for entry in fs::read_dir(current_path).map_err(|e| {
-            AppError::IOError(e) // Convert fs::Error to AppError::IOError
+            AppError::TemplateError(format!("Failed to read directory {}: {}", current_path.display(), e))
         })? {
-            let entry_path = entry.map_err(|e| AppError::IOError(e))?.path();
+            let entry_path = entry.map_err(|e| AppError::TemplateError(format!("Failed to read directory entry: {}", e)))?.path();
             if entry_path.is_dir() {
                 self._load_recursive(&entry_path)?;
             } else if entry_path.is_file() {
@@ -107,5 +107,145 @@ impl TemplateManager {
 impl Default for TemplateManager {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tempfile::Builder;
+    use std::fs::{File, create_dir_all};
+    use std::io::Write;
+    use image::{ImageBuffer, Rgb}; // For dummy images
+
+    // Helper to create a dummy PNG (RGB)
+    fn create_dummy_png(path: &std::path::Path, width: u32, height: u32, color: [u8; 3]) {
+        if let Some(parent) = path.parent() {
+            create_dir_all(parent).expect("Failed to create parent directory for dummy PNG");
+        }
+        let img: ImageBuffer<Rgb<u8>, Vec<u8>> = ImageBuffer::from_fn(width, height, |_, _| Rgb(color));
+        img.save_with_format(path, image::ImageFormat::Png).expect(&format!("Failed to save dummy PNG to {:?}", path));
+    }
+
+    // Helper to create a dummy JPG (RGB)
+    fn create_dummy_jpg(path: &std::path::Path, width: u32, height: u32, color: [u8; 3]) {
+        if let Some(parent) = path.parent() {
+            create_dir_all(parent).expect("Failed to create parent directory for dummy JPG");
+        }
+        let img: ImageBuffer<Rgb<u8>, Vec<u8>> = ImageBuffer::from_fn(width, height, |_, _| Rgb(color));
+        img.save_with_format(path, image::ImageFormat::Jpeg).expect(&format!("Failed to save dummy JPG to {:?}", path));
+    }
+
+
+    #[test]
+    fn test_load_templates_valid_structure() {
+        let temp_dir = Builder::new().prefix("templates_valid").tempdir().unwrap();
+        let root_path = temp_dir.path();
+
+        create_dummy_png(&root_path.join("template_a.png"), 10, 10, [255,0,0]);
+        create_dummy_jpg(&root_path.join("template_b.jpg"), 10, 10, [0,255,0]);
+
+        let sub_dir_path = root_path.join("sub_dir");
+        create_dir_all(&sub_dir_path).unwrap();
+        create_dummy_png(&sub_dir_path.join("template_c.png"), 10, 10, [0,0,255]);
+
+        let mut tm = TemplateManager::new();
+        let result = tm.load_templates_from_directory(root_path.to_str().unwrap());
+
+        assert!(result.is_ok(), "Loading valid templates failed: {:?}", result.err());
+        assert_eq!(tm.templates.len(), 3, "Expected 3 templates to be loaded.");
+        assert!(tm.get_template("template_a").is_some());
+        assert_eq!(tm.get_template("template_a").unwrap().name, "template_a");
+        assert!(tm.get_template("template_b").is_some());
+        assert!(tm.get_template("template_c").is_some());
+    }
+
+    #[test]
+    fn test_load_templates_empty_directory() {
+        let temp_dir = Builder::new().prefix("templates_empty").tempdir().unwrap();
+        let mut tm = TemplateManager::new();
+        let result = tm.load_templates_from_directory(temp_dir.path().to_str().unwrap());
+
+        assert!(result.is_ok());
+        assert_eq!(tm.templates.len(), 0, "Expected 0 templates from an empty directory.");
+    }
+
+    #[test]
+    fn test_load_templates_with_non_image_files() {
+        let temp_dir = Builder::new().prefix("templates_mixed").tempdir().unwrap();
+        let root_path = temp_dir.path();
+
+        create_dummy_png(&root_path.join("image.png"), 10, 10, [1,2,3]);
+        let mut text_file = File::create(root_path.join("text.txt")).unwrap();
+        text_file.write_all(b"This is not an image.").unwrap();
+
+        let mut tm = TemplateManager::new();
+        let result = tm.load_templates_from_directory(root_path.to_str().unwrap());
+
+        assert!(result.is_ok());
+        assert_eq!(tm.templates.len(), 1, "Expected only 1 image template to be loaded.");
+        assert!(tm.get_template("image").is_some());
+    }
+
+    #[test]
+    fn test_load_templates_invalid_path_is_file() {
+        let mut tmp_file = Builder::new().suffix(".txt").tempfile().unwrap();
+        tmp_file.write_all(b"I am a file, not a directory.").unwrap();
+
+        let mut tm = TemplateManager::new();
+        let result = tm.load_templates_from_directory(tmp_file.path().to_str().unwrap());
+
+        assert!(result.is_err());
+        match result.err().unwrap() {
+            AppError::ConfigError(msg) => assert!(msg.contains("Provided path is not a directory")),
+            e => panic!("Expected ConfigError for invalid path, got {:?}", e),
+        }
+    }
+
+    #[test]
+    fn test_load_templates_invalid_path_not_exist() {
+        let mut tm = TemplateManager::new();
+        let result = tm.load_templates_from_directory("path_does_not_exist_at_all");
+        assert!(result.is_err());
+         match result.err().unwrap() {
+            AppError::ConfigError(msg) => assert!(msg.contains("Provided path is not a directory")), // fs::read_dir check comes after is_dir
+            e => panic!("Expected ConfigError for non-existent path, got {:?}", e),
+        }
+    }
+
+
+    #[test]
+    fn test_load_templates_duplicate_names() {
+        let temp_dir = Builder::new().prefix("templates_dup").tempdir().unwrap();
+        let root_path = temp_dir.path();
+
+        create_dummy_png(&root_path.join("img.png"), 10, 10, [255,0,0]); // First img.png
+
+        let sub_dir_path = root_path.join("sub");
+        create_dir_all(&sub_dir_path).unwrap();
+        create_dummy_png(&sub_dir_path.join("img.png"), 10, 10, [0,0,255]); // Second img.png in sub
+
+        let mut tm = TemplateManager::new();
+        let result = tm.load_templates_from_directory(root_path.to_str().unwrap());
+
+        assert!(result.is_ok());
+        assert_eq!(tm.templates.len(), 1, "Expected 1 template due to name collision (last one wins).");
+        assert!(tm.get_template("img").is_some());
+        // Color check would be more robust if we knew which one "wins", but dir order is not guaranteed.
+        // For now, just checking count and existence is sufficient for this test's purpose.
+    }
+
+    #[test]
+    fn test_get_template() {
+        let temp_dir = Builder::new().prefix("templates_get").tempdir().unwrap();
+        let root_path = temp_dir.path();
+        create_dummy_png(&root_path.join("find_me.png"), 5, 5, [1,1,1]);
+
+        let mut tm = TemplateManager::new();
+        tm.load_templates_from_directory(root_path.to_str().unwrap()).unwrap();
+
+        assert!(tm.get_template("find_me").is_some(), "Should find 'find_me'");
+        assert_eq!(tm.get_template("find_me").unwrap().name, "find_me");
+        assert!(tm.get_template("dont_find_me").is_none(), "Should not find 'dont_find_me'");
     }
 }

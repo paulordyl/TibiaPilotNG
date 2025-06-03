@@ -159,14 +159,63 @@ fn _get_roi_from_mat(mat: &Mat, x: i32, y: i32, width: i32, height: i32) -> Resu
 /// # Returns
 /// `Ok(Vec<(i32, i32, u32, u32)>)` containing all found locations `(x, y, width, height)`.
 /// `Err(AppError)` if an error occurs during processing.
-#[allow(unused_variables)] // max_overlap is not used yet
+use log::debug; // Added debug log
+
+// Helper struct for NMS
+#[derive(Debug, Clone)]
+struct Detection {
+    rect: Rect_<i32>,
+    score: f32,
+}
+
+/// Calculates the Intersection over Union (IoU) for two rectangles.
+/// Rectangles are opencv::core::Rect_<i32>
+fn calculate_iou(rect1: &Rect_<i32>, rect2: &Rect_<i32>) -> f32 {
+    let x_a = core::max(rect1.x, rect2.x);
+    let y_a = core::max(rect1.y, rect2.y);
+    let x_b = core::min(rect1.x + rect1.width, rect2.x + rect2.width);
+    let y_b = core::min(rect1.y + rect1.height, rect2.y + rect2.height);
+
+    let intersection_area = core::max(0, x_b - x_a) * core::max(0, y_b - y_a);
+    if intersection_area <= 0 {
+        return 0.0;
+    }
+
+    let rect1_area = rect1.width * rect1.height;
+    let rect2_area = rect2.width * rect2.height;
+
+    let union_area = (rect1_area + rect2_area - intersection_area) as f32;
+    if union_area <= 0.0 { // Should not happen if areas are positive and intersection is less
+        return 0.0;
+    }
+
+    intersection_area as f32 / union_area
+}
+
+
+/// Locates all non-overlapping occurrences of a template image within a larger image
+/// using Non-Maximum Suppression (NMS).
+///
+/// # Arguments
+/// * `haystack` - The larger image in which to search.
+/// * `needle` - The template image to search for.
+/// * `confidence_threshold` - A float between 0.0 and 1.0. Matches below this threshold are ignored.
+/// * `max_overlap_threshold` - A float between 0.0 and 1.0. If IoU between two detections is
+///                             greater than this, the one with lower score is suppressed.
+///
+/// # Returns
+/// `Ok(Vec<(i32, i32, u32, u32)>)` containing all found locations `(x, y, width, height)`.
+/// `Err(AppError)` if an error occurs during processing.
 pub fn locate_all_templates_on_image(
     haystack: &DynamicImage,
     needle: &DynamicImage,
     confidence_threshold: f32,
-    max_overlap: f32, // For future NMS
+    max_overlap_threshold: f32,
 ) -> Result<Vec<(i32, i32, u32, u32)>, AppError> {
-    info!("Attempting to locate all occurrences of a template on image.");
+    info!(
+        "Locating all templates. Confidence: {}, Max Overlap: {}",
+        confidence_threshold, max_overlap_threshold
+    );
 
     let haystack_mat = dynamic_image_to_mat(haystack)?;
     let needle_mat = dynamic_image_to_mat(needle)?;
@@ -182,75 +231,268 @@ pub fn locate_all_templates_on_image(
     imgproc::match_template(&haystack_mat, &needle_mat, &mut result_mat, imgproc::TM_CCOEFF_NORMED, &Mat::default())
         .map_err(|e| AppError::ImageProcessingError(format!("OpenCV template matching failed: {}", e)))?;
 
-    let mut found_locations: Vec<(i32, i32, u32, u32)> = Vec::new();
     let needle_width = needle_mat.cols();
     let needle_height = needle_mat.rows();
 
-    loop {
-        let mut min_val = 0.0;
-        let mut max_val = 0.0;
-        let mut min_loc = core::Point::new(0, 0);
-        let mut max_loc = core::Point::new(0, 0);
+    let mut potential_detections: Vec<Detection> = Vec::new();
 
-        core::min_max_loc(&result_mat, Some(&mut min_val), Some(&mut max_val), Some(&mut min_loc), Some(&mut max_loc), &Mat::default())
-            .map_err(|e| AppError::ImageProcessingError(format!("Failed to find min/max location in result matrix: {}", e)))?;
-
-        if max_val >= confidence_threshold as f64 {
-            info!(
-                "Found template match at ({}, {}) with confidence {:.2}",
-                max_loc.x, max_loc.y, max_val
-            );
-            found_locations.push((max_loc.x, max_loc.y, needle_width as u32, needle_height as u32));
-
-            // "Clear" or "mask out" the region of this found match in the result matrix.
-            // This is a simple way to prevent finding the same match again.
-            // The region to clear is centered around max_loc and is typically related to needle size.
-            // For simplicity, we clear a rectangle of the needle's size.
-            // A more sophisticated NMS might use `max_overlap`.
-            let clear_rect_x = max_loc.x - needle_width / 2; // Start clearing a bit to the left of the found match
-            let clear_rect_y = max_loc.y - needle_height / 2; // Start clearing a bit above the found match
-            
-            // Ensure clear_rect coordinates are within the bounds of result_mat
-            let roi_x = core::max(0, clear_rect_x) as i32;
-            let roi_y = core::max(0, clear_rect_y) as i32;
-
-            // Calculate width and height of ROI, ensuring it doesn't exceed result_mat dimensions
-            let roi_width = core::min(needle_width, result_mat.cols() - roi_x) as i32;
-            let roi_height = core::min(needle_height, result_mat.rows() - roi_y) as i32;
-
-            if roi_width > 0 && roi_height > 0 {
-                let mut roi = Mat::roi(&mut result_mat, Rect_::new(roi_x, roi_y, roi_width, roi_height))
-                    .map_err(|e| AppError::ImageProcessingError(format!("Failed to get ROI for clearing: {}", e)))?;
-                
-                // Set this region to a value below the threshold (e.g., 0 or min_val - epsilon)
-                roi.set_to(core::Scalar::new(min_val - 0.1, 0.0, 0.0, 0.0)) // Set to a low value
-                    .map_err(|e| AppError::ImageProcessingError(format!("Failed to clear region in result matrix: {}", e)))?;
-                debug!("Cleared region around ({}, {}) in result matrix.", max_loc.x, max_loc.y);
-            } else {
-                debug!("Skipping clear for match at ({},{}) as calculated ROI is invalid (width/height <=0)", max_loc.x, max_loc.y);
-                 // If the ROI is invalid (e.g. match at edge), we might risk an infinite loop if this match isn't properly suppressed.
-                 // For now, we break to avoid potential infinite loops if clearing fails at edges.
-                 // A more robust solution might be needed if this becomes an issue.
-                 // One simple fix: ensure at least a 1x1 area around max_loc itself is cleared.
-                 if result_mat.cols() > max_loc.x && result_mat.rows() > max_loc.y {
-                     result_mat.at_2d_mut::<core::Vec<f32, 1>>(max_loc.y, max_loc.x).unwrap()[0] = min_val as f32 - 0.1f32;
-                 }
-                 // Break if we can't clear properly to avoid issues, or handle more gracefully.
-                 // break; 
+    // Iterate through the result_mat to find all points above the confidence threshold.
+    // result_mat is a CV_32F (float) matrix.
+    for y in 0..result_mat.rows() {
+        for x in 0..result_mat.cols() {
+            let score = *result_mat.at_2d::<f32>(y, x).map_err(|e| AppError::ImageProcessingError(format!("Failed to access result_mat at ({},{}): {}", y, x, e)))?;
+            if score >= confidence_threshold {
+                potential_detections.push(Detection {
+                    rect: Rect_::new(x, y, needle_width, needle_height),
+                    score,
+                });
             }
-        } else {
-            info!("No more matches found with confidence >= {:.2}. Max found was {:.2}", confidence_threshold, max_val);
-            break; // No more matches above threshold
         }
     }
+    debug!("Found {} potential detections above confidence threshold {}.", potential_detections.len(), confidence_threshold);
 
-    info!("Found {} locations in total for the template.", found_locations.len());
-    Ok(found_locations)
+    // Sort potential detections by score in descending order.
+    potential_detections.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal));
+
+    let mut final_detections: Vec<Rect_<i32>> = Vec::new();
+    while !potential_detections.is_empty() {
+        // Take the detection with the highest score.
+        let best_detection = potential_detections.remove(0);
+        final_detections.push(best_detection.rect.clone());
+        debug!("Selected best detection: {:?} with score {}", best_detection.rect, best_detection.score);
+
+        // Remove detections that significantly overlap with the best_detection.
+        potential_detections.retain(|detection| {
+            let iou = calculate_iou(&best_detection.rect, &detection.rect);
+            let should_retain = iou <= max_overlap_threshold;
+            if !should_retain {
+                debug!("Suppressing detection {:?} (score {}) due to IoU {} with {:?}.",
+                       detection.rect, detection.score, iou, best_detection.rect);
+            }
+            should_retain
+        });
+    }
+
+    info!("NMS complete. Found {} final detections.", final_detections.len());
+
+    // Convert final_detections (Vec<Rect_<i32>>) to Vec<(i32, i32, u32, u32)>
+    let output_locations = final_detections
+        .into_iter()
+        .map(|rect| (rect.x, rect.y, rect.width as u32, rect.height as u32))
+        .collect();
+
+    Ok(output_locations)
 }
 
 
-use crate::image_processing::{templates::TemplateManager, cache::DetectionCache}; // Added DetectionCache
+use crate::image_processing::{templates::TemplateManager, cache::DetectionCache};
 use crate::screen_capture::capture; // Import screen capture functions
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use opencv::core::Rect_;
+
+    #[test]
+    fn test_calculate_iou_no_overlap() {
+        let rect1 = Rect_::new(0, 0, 10, 10);
+        let rect2 = Rect_::new(20, 20, 10, 10);
+        assert_eq!(calculate_iou(&rect1, &rect2), 0.0);
+    }
+
+    #[test]
+    fn test_calculate_iou_full_overlap() {
+        let rect1 = Rect_::new(0, 0, 10, 10);
+        let rect2 = Rect_::new(0, 0, 10, 10);
+        assert_eq!(calculate_iou(&rect1, &rect2), 1.0);
+    }
+
+    #[test]
+    fn test_calculate_iou_partial_overlap() {
+        let rect1 = Rect_::new(0, 0, 10, 10);  // Area = 100
+        let rect2 = Rect_::new(5, 5, 10, 10);  // Area = 100
+        // Intersection: x_a=5, y_a=5, x_b=10, y_b=10. width=5, height=5. Area_I = 25
+        // Union: 100 + 100 - 25 = 175
+        // IoU = 25 / 175 = 1/7
+        assert_eq!(calculate_iou(&rect1, &rect2), 25.0 / 175.0);
+    }
+
+    #[test]
+    fn test_calculate_iou_one_contains_other() {
+        let rect1 = Rect_::new(0, 0, 20, 20); // Area = 400
+        let rect2 = Rect_::new(5, 5, 10, 10); // Area = 100
+        // Intersection: x_a=5, y_a=5, x_b=15, y_b=15. width=10, height=10. Area_I = 100
+        // Union: 400 + 100 - 100 = 400
+        // IoU = 100 / 400 = 0.25
+        assert_eq!(calculate_iou(&rect1, &rect2), 100.0 / 400.0);
+    }
+
+    #[test]
+    fn test_calculate_iou_touching_edges() {
+        let rect1 = Rect_::new(0,0,10,10);
+        let rect2 = Rect_::new(10,0,10,10); // Touches at x=10
+        assert_eq!(calculate_iou(&rect1, &rect2), 0.0);
+    }
+
+    // It's challenging to create a full integration test for locate_all_templates_on_image
+    // without actual image files and a more complex setup.
+    // However, we can test the NMS logic conceptually if we could mock `match_template`
+    // or provide a pre-computed `result_mat`. This is beyond simple changes here.
+    // The existing test in `digit_recognition.rs` will cover the basic flow.
+
+    // --- Tests for NMS Logic Simulation ---
+    // Re-define MockDetection locally for this test module if not accessible otherwise
+    // (it's defined at the module level where locate_all_templates_on_image is)
+    // For testing, we can just use the same struct definition if it's private to the parent module.
+    // If `Detection` struct is private to parent, we might need to re-define or make it pub(crate).
+    // Assuming `Detection` struct is accessible for now, or we'll use tuples/local struct.
+    // For simplicity, let's assume we can create `Detection` instances here for the mock NMS.
+    // If not, the `perform_mock_nms` can take Vec<(Rect_<i32>, f32)>
+
+    fn perform_mock_nms(mut potential_detections: Vec<super::Detection>, max_overlap_threshold: f32) -> Vec<Rect_<i32>> {
+        potential_detections.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal));
+        let mut final_detections: Vec<Rect_<i32>> = Vec::new();
+        while !potential_detections.is_empty() {
+            let best_detection = potential_detections.remove(0);
+            final_detections.push(best_detection.rect.clone());
+            potential_detections.retain(|detection| {
+                let iou = calculate_iou(&best_detection.rect, &detection.rect);
+                iou <= max_overlap_threshold
+            });
+        }
+        final_detections
+    }
+
+    #[test]
+    fn test_nms_no_overlap() {
+        let detections = vec![
+            super::Detection { rect: Rect_::new(0, 0, 10, 10), score: 0.9 },
+            super::Detection { rect: Rect_::new(20, 20, 10, 10), score: 0.8 },
+        ];
+        let kept = perform_mock_nms(detections, 0.3);
+        assert_eq!(kept.len(), 2);
+    }
+
+    #[test]
+    fn test_nms_full_overlap() {
+        let detections = vec![
+            super::Detection { rect: Rect_::new(0, 0, 10, 10), score: 0.9 },
+            super::Detection { rect: Rect_::new(0, 0, 10, 10), score: 0.8 }, // Same rect, lower score
+        ];
+        let kept = perform_mock_nms(detections, 0.3);
+        assert_eq!(kept.len(), 1);
+        assert_eq!(kept[0], Rect_::new(0, 0, 10, 10)); // Ensures the one with score 0.9 was kept
+    }
+
+    #[test]
+    fn test_nms_partial_overlap_suppress() {
+        let detections = vec![
+            super::Detection { rect: Rect_::new(0, 0, 10, 10), score: 0.9 }, // Area 100
+            super::Detection { rect: Rect_::new(5, 0, 10, 10), score: 0.8 }, // Area 100, Overlap 50 (5x10), IoU = 50 / (100+100-50) = 50/150 = 0.333
+        ];
+        let kept = perform_mock_nms(detections, 0.3); // Threshold 0.3, IoU is > 0.3
+        assert_eq!(kept.len(), 1);
+        assert_eq!(kept[0], Rect_::new(0, 0, 10, 10));
+    }
+
+    #[test]
+    fn test_nms_partial_overlap_keep() {
+        let detections = vec![
+            super::Detection { rect: Rect_::new(0, 0, 10, 10), score: 0.9 }, // Area 100
+            super::Detection { rect: Rect_::new(8, 0, 10, 10), score: 0.8 }, // Area 100, Overlap 20 (2x10), IoU = 20 / (100+100-20) = 20/180 = 0.111
+        ];
+        let kept = perform_mock_nms(detections, 0.3); // Threshold 0.3, IoU is < 0.3
+        assert_eq!(kept.len(), 2);
+    }
+
+    #[test]
+    fn test_nms_multiple_overlaps() {
+        let detections = vec![
+            super::Detection { rect: Rect_::new(0, 0, 10, 10), score: 0.9 },  // A
+            super::Detection { rect: Rect_::new(5, 0, 10, 10), score: 0.8 },  // B (overlaps A significantly)
+            super::Detection { rect: Rect_::new(20, 0, 10, 10), score: 0.7 }, // C (no overlap with A)
+            super::Detection { rect: Rect_::new(22, 0, 10, 10), score: 0.6 }, // D (overlaps C significantly)
+        ];
+        // Expected: A is kept. B is suppressed by A. C is kept. D is suppressed by C.
+        let kept = perform_mock_nms(detections, 0.3);
+        assert_eq!(kept.len(), 2);
+        assert!(kept.contains(&Rect_::new(0,0,10,10)));
+        assert!(kept.contains(&Rect_::new(20,0,10,10)));
+    }
+
+    // --- Tests for locate_template_on_image ---
+    use image::{GrayImage, RgbImage, Luma, Rgb};
+
+    fn create_test_gray_image(width: u32, height: u32, pattern: Option<(Rect_<i32>, u8)>) -> DynamicImage {
+        let mut img = GrayImage::new(width, height);
+        for y in 0..height { // Fill with a base color (e.g., 50)
+            for x in 0..width {
+                img.put_pixel(x, y, Luma([50]));
+            }
+        }
+        if let Some((rect, val)) = pattern {
+            for r_y in rect.y..(rect.y + rect.height) {
+                for r_x in rect.x..(rect.x + rect.width) {
+                    if r_x >=0 && r_x < width as i32 && r_y >=0 && r_y < height as i32 {
+                        img.put_pixel(r_x as u32, r_y as u32, Luma([val]));
+                    }
+                }
+            }
+        }
+        DynamicImage::ImageLuma8(img)
+    }
+
+    #[test]
+    fn test_locate_template_on_image_clear_match() {
+        let needle_pattern_rect = Rect_::new(0,0,3,3); // Relative to needle itself
+        let needle = create_test_gray_image(3, 3, Some((needle_pattern_rect, 200))); // 3x3 needle, all 200
+
+        let haystack_pattern_rect = Rect_::new(5,5,3,3); // Place needle at (5,5) in haystack
+        let haystack = create_test_gray_image(10, 10, Some((haystack_pattern_rect, 200)));
+
+        let result = locate_template_on_image(&haystack, &needle, 0.9).unwrap();
+        assert_eq!(result, Some((5, 5, 3, 3))); // x, y, width, height
+    }
+
+    #[test]
+    fn test_locate_template_on_image_no_match() {
+        let needle = create_test_gray_image(3, 3, Some((Rect_::new(0,0,3,3), 200)));
+        let haystack = create_test_gray_image(10, 10, Some((Rect_::new(0,0,10,10), 100))); // Haystack all 100s
+
+        let result = locate_template_on_image(&haystack, &needle, 0.9).unwrap();
+        assert_eq!(result, None);
+    }
+
+    #[test]
+    fn test_locate_template_on_image_low_confidence() {
+        // Create a needle (e.g. all 200s)
+        let needle = create_test_gray_image(3, 3, Some((Rect_::new(0,0,3,3), 200)));
+
+        // Create a haystack where a region is *similar* but not identical (e.g. all 190s)
+        let mut haystack_img = GrayImage::new(10, 10);
+        for y in 0..10 { for x in 0..10 { haystack_img.put_pixel(x, y, Luma([50])); } } // Base
+        for r_y in 5..(5 + 3) { // Similar pattern at (5,5)
+            for r_x in 5..(5 + 3) {
+                haystack_img.put_pixel(r_x, r_y, Luma([190]));
+            }
+        }
+        let haystack = DynamicImage::ImageLuma8(haystack_img);
+
+        // With high threshold, should not match
+        let result_high_thresh = locate_template_on_image(&haystack, &needle, 0.95).unwrap();
+        assert_eq!(result_high_thresh, None);
+
+        // With very low threshold, it should find the "best" of the weak matches
+        let result_low_thresh = locate_template_on_image(&haystack, &needle, 0.1).unwrap();
+        assert!(result_low_thresh.is_some());
+        // The exact location might vary based on normalization, but it should be around (5,5)
+        if let Some((x,y,_,_)) = result_low_thresh {
+            assert!((x - 5).abs() <= 1 && (y - 5).abs() <= 1, "Match location {:?} is not around (5,5)", (x,y));
+        }
+    }
+}
+
 
 /// Finds a template on the screen within a specified region, optionally using a cache.
 ///
