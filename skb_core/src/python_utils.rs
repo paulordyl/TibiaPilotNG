@@ -698,7 +698,8 @@ fn rust_utils_module(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(get_capacity, m)?)?;
     m.add_function(wrap_pyfunction!(get_speed, m)?)?;
     m.add_function(wrap_pyfunction!(get_food, m)?)?;
-    m.add_function(wrap_pyfunction!(get_stamina, m)?)?;
+    m.add_function(wrap_pyfunction!(find_closest_coordinate, m)?)?;
+    m.add_function(wrap_pyfunction!(check_matrix_rules, m)?)?; // Added new function
 
     // Add merged functions
     m.add_function(wrap_pyfunction!(get_hp_rust, m)?)?;
@@ -1243,6 +1244,96 @@ generate_skill_getter!(get_speed, "speed", numbers_hashes);
 // If they use the same numbers_hashes for numerical values:
 generate_skill_getter!(get_food, "food", minutes_or_hours_hashes); // Or numbers_hashes if direct number
 generate_skill_getter!(get_stamina, "stamina", minutes_or_hours_hashes);
+
+
+// === Matrix Checking Utilities ===
+
+#[pyfunction]
+#[pyo3(signature = (matrix, other_image, ignorable_values))]
+fn check_matrix_rules(
+    matrix: PyReadonlyArray2<u8>,
+    other_image: PyReadonlyArray2<u8>,
+    ignorable_values: Vec<u8>,
+) -> PyResult<bool> {
+    let matrix_array = matrix.as_array();
+    let other_array = other_image.as_array();
+
+    // Check if dimensions match. If not, rules cannot be applied as per original logic.
+    if matrix_array.shape() != other_array.shape() {
+        // Consider PyErr for dimension mismatch if this is an error condition.
+        // Based on typical use of such function, it implies 'other_image' is a sub-image
+        // of the same dimensions as 'matrix' that is being checked.
+        return Ok(false);
+    }
+
+    let (height, width) = (matrix_array.shape()[0], matrix_array.shape()[1]);
+
+    for r in 0..height {
+        for c in 0..width {
+            let matrix_pixel = matrix_array[[r, c]];
+
+            // Check if the matrix_pixel is one of the ignorable_values
+            let mut is_ignorable = false;
+            for &ignorable_val in &ignorable_values {
+                if matrix_pixel == ignorable_val {
+                    is_ignorable = true;
+                    break;
+                }
+            }
+
+            if !is_ignorable {
+                let other_pixel = other_array[[r, c]];
+                if matrix_pixel != other_pixel {
+                    return Ok(false); // Rule violated: non-ignorable pixel differs
+                }
+            }
+        }
+    }
+
+    Ok(true) // All non-ignorable pixels in matrix match the corresponding pixels in other_image
+}
+
+
+// === Coordinate Utilities ===
+
+/// Represents a 3D coordinate (x, y, z).
+/// For PyO3, a tuple (f64, f64, f64) will be used directly for simplicity.
+// type Coordinate = (f64, f64, f64); // Not needed as a type alias for direct use in signature
+
+#[pyfunction]
+#[pyo3(signature = (target, coordinates_list))]
+fn find_closest_coordinate(
+    target: (f64, f64, f64),
+    coordinates_list: Vec<(f64, f64, f64)>,
+) -> PyResult<Option<(f64, f64, f64)>> {
+    if coordinates_list.is_empty() {
+        return Ok(None);
+    }
+
+    let target_x = target.0;
+    let target_y = target.1;
+    // target.2 (z-coordinate) is ignored for distance calculation, similar to original CFFI.
+
+    let mut min_dist_sq = f64::MAX;
+    let mut closest_coord_idx: Option<usize> = None;
+
+    for (idx, coord) in coordinates_list.iter().enumerate() {
+        let dx = coord.0 - target_x;
+        let dy = coord.1 - target_y;
+        // Z-coordinate (coord.2) is ignored.
+        let dist_sq = dx * dx + dy * dy;
+
+        if dist_sq < min_dist_sq {
+            min_dist_sq = dist_sq;
+            closest_coord_idx = Some(idx);
+        }
+    }
+
+    match closest_coord_idx {
+        Some(idx) => Ok(Some(coordinates_list[idx])),
+        None => Ok(None), // Should not happen if coordinates_list is not empty
+    }
+}
 
 #[pyfunction]
 fn check_cooldown_status(screenshot_array: PyReadonlyArray2<u8>, group_name: String) -> PyResult<bool> {

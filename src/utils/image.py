@@ -1,7 +1,4 @@
-# import ctypes # No longer needed for these functions
-# from numba import njit # No longer needed for convertGraysToBlack
 import numpy as np
-# from py_rust_utils import lib as py_rust_lib # Old FFI import, no longer needed
 from typing import Union
 from src.shared.typings import BBox, GrayImage
 # hashit and locate are imported from core, which is already refactored.
@@ -59,7 +56,6 @@ def cacheChain(imageList):
 
 
 # TODO: add unit tests
-# @njit(cache=True, fastmath=True) # This decorator is removed
 def convertGraysToBlack(arr: np.ndarray) -> np.ndarray:
     """
     Filters gray pixels (values between 50 and 100, inclusive) to black (0)
