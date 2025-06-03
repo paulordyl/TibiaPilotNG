@@ -1,0 +1,16 @@
+[package]
+name = "skb_modules"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+config = { version = "0.15.11", features = ["ini", "json", "yaml"] }
+# eframe = "0.23.0" # Commenting out eframe due to MSRV issues with Rust 1.75.0
+image = { version = "0.25.6", default-features = false, features = ["png", "jpeg"] }
+imageproc = { version = "0.25.0", default-features = false }
+leptess = "0.14.0"
+rdev = "0.5.3"
+scrap = "0.5.0"
+serde = { version = "1.0.219", features = ["derive"] }
