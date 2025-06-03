@@ -1,0 +1,12 @@
+[package]
+name = "skb_capture"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+scrap = "0.5"
+image = "0.24" # Using 0.24 as it was known to be compatible with Rust 1.75 features used
+thiserror = "1.0"
+log = "0.4"
+# For tests, env_logger is useful
+env_logger = { version = "0.10", optional = true }

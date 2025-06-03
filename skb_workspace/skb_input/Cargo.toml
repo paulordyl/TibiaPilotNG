@@ -1,0 +1,13 @@
+[package]
+name = "skb_input"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+rdev = "0.5.3"
+thiserror = "1.0"
+log = "0.4"
+
+# For tests
+[dev-dependencies]
+env_logger = { version = "0.10", optional = true }

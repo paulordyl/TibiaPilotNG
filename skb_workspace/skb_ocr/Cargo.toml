@@ -1,0 +1,17 @@
+[package]
+name = "skb_ocr"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+leptess = "0.14.0"
+image = "0.24"
+thiserror = "1.0"
+log = "0.4"
+tempfile = "3.8"
+
+# For tests
+[dev-dependencies]
+env_logger = "0.10"
+lazy_static = "1.4.0"
+std_semaphore = "0.1.0"
