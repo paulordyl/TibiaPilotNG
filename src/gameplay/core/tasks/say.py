@@ -1,3 +1,5 @@
+import random
+import time
 from src.gameplay.typings import Context
 import src.utils.keyboard as keyboard
 from ...typings import Context
@@ -15,5 +17,6 @@ class SayTask(BaseTask):
 
     def do(self, context: Context) -> Context:
         keyboard.write(self.phrase)
+        time.sleep(random.uniform(0.05, 0.15)) # Small delay before pressing enter
         keyboard.press('enter')
         return context
