@@ -29,5 +29,7 @@ var/
 venv
 
 # Rust build output
+target/
 rust_bot_ng/target/
 py_rust_utils/target/
+skb_modules/target/**
