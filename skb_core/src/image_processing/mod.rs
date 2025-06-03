@@ -1,11 +1,6 @@
-// Make the matching module and its contents public
-pub mod matching;
-
-// Make the templates module and its contents public
-pub mod templates;
-
-// Make the cache module and its contents public
+// Declare sub-modules within image_processing
 pub mod cache;
-
-// Make the digit_recognition module and its contents public
 pub mod digit_recognition;
+pub mod matching;
+pub mod templates;
+pub mod hash_utils; // Newly added module

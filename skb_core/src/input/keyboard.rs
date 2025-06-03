@@ -3,9 +3,10 @@ use crate::AppError;
 use log::debug;
 
 // A subset of key mappings. This should be expanded as needed.
-// Based on https://www.arduino.cc/reference/en/language/functions/usb/keyboard/keyboardmodifiers/
-// and https://www.arduino.cc/reference/en/language/functions/usb/keyboard/asciichart/
-fn get_ascii_from_key(key: &str) -> u8 {
+// Made public for testing, or could be tested via command generation functions.
+// For direct testing, it's easier if it's pub(crate) or pub.
+// Let's make it pub(crate) for now, assuming tests are in the same crate.
+pub(crate) fn get_ascii_from_key(key: &str) -> u8 {
     match key {
         "a" => b'a', "b" => b'b', "c" => b'c', "d" => b'd', "e" => b'e',
         "f" => b'f', "g" => b'g', "h" => b'h', "i" => b'i', "j" => b'j',
@@ -55,27 +56,50 @@ fn get_ascii_from_key(key: &str) -> u8 {
     }
 }
 
+// Command Generation Helpers
+fn generate_hotkey_command(keys: &[&str]) -> String {
+    let ascii_keys: Vec<String> = keys.iter().map(|k| get_ascii_from_key(k).to_string()).collect();
+    format!("hotkey,{}", ascii_keys.join(","))
+}
+
+fn generate_key_down_command(key: &str) -> String {
+    let ascii_key = get_ascii_from_key(key);
+    format!("key_down,{}", ascii_key)
+}
+
+fn generate_key_up_command(key: &str) -> String {
+    let ascii_key = get_ascii_from_key(key);
+    format!("key_up,{}", ascii_key)
+}
+
+fn generate_press_command(keys: &[&str]) -> String {
+    let ascii_keys: Vec<String> = keys.iter().map(|k| get_ascii_from_key(k).to_string()).collect();
+    format!("press,{}", ascii_keys.join(","))
+}
+
+fn generate_write_command(phrase: &str) -> String {
+    format!("write,{}", phrase)
+}
+
+
 pub fn hotkey(arduino: &mut ArduinoCom, keys: &[&str]) -> Result<(), AppError> {
     if keys.is_empty() {
         return Err(AppError::InputError("Hotkey keys slice cannot be empty".to_string()));
     }
-    let ascii_keys: Vec<String> = keys.iter().map(|k| get_ascii_from_key(k).to_string()).collect();
-    let command = format!("hotkey,{}", ascii_keys.join(","));
-    debug!("Executing hotkey: {:?}", keys);
+    let command = generate_hotkey_command(keys);
+    debug!("Executing hotkey: {:?} (command: {})", keys, command);
     arduino.send_command(&command)
 }
 
 pub fn key_down(arduino: &mut ArduinoCom, key: &str) -> Result<(), AppError> {
-    let ascii_key = get_ascii_from_key(key);
-    let command = format!("key_down,{}", ascii_key);
-    debug!("Executing key_down: {}", key);
+    let command = generate_key_down_command(key);
+    debug!("Executing key_down: {} (command: {})", key, command);
     arduino.send_command(&command)
 }
 
 pub fn key_up(arduino: &mut ArduinoCom, key: &str) -> Result<(), AppError> {
-    let ascii_key = get_ascii_from_key(key);
-    let command = format!("key_up,{}", ascii_key);
-    debug!("Executing key_up: {}", key);
+    let command = generate_key_up_command(key);
+    debug!("Executing key_up: {} (command: {})", key, command);
     arduino.send_command(&command)
 }
 
@@ -83,28 +107,82 @@ pub fn press(arduino: &mut ArduinoCom, keys: &[&str]) -> Result<(), AppError> {
     if keys.is_empty() {
         return Err(AppError::InputError("Press keys slice cannot be empty".to_string()));
     }
-    let ascii_keys: Vec<String> = keys.iter().map(|k| get_ascii_from_key(k).to_string()).collect();
-    let command = format!("press,{}", ascii_keys.join(","));
-    debug!("Executing press: {:?}", keys);
+    let command = generate_press_command(keys);
+    debug!("Executing press: {:?} (command: {})", keys, command);
     arduino.send_command(&command)
 }
 
 pub fn write(arduino: &mut ArduinoCom, phrase: &str) -> Result<(), AppError> {
-    // The Python version sends one character at a time for `write`.
-    // We'll prepare a single command string for simplicity, assuming the Arduino can handle it,
-    // or it can be split into multiple `press` commands if needed.
-    // The original python code does `press(key)` for each char.
-    // A direct translation would be:
-    // for char_as_str in phrase.chars().map(|c| c.to_string()) {
-    //     press(arduino, &[&char_as_str])?;
-    // }
-    // Ok(())
-    // However, to minimize serial calls, let's try sending the whole phrase.
-    // Arduino side will need to parse "write,s,t,r,i,n,g" or similar.
-    // Or, if the Arduino side `write` command is smart, "write,string"
-    // For now, let's assume the latter for simplicity.
-    // If it's char by char, the command should be like `press` for each char.
-    let command = format!("write,{}", phrase);
-    debug!("Executing write: {}", phrase);
+    let command = generate_write_command(phrase);
+    debug!("Executing write: {} (command: {})", phrase, command);
     arduino.send_command(&command)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_get_ascii_from_key_known() {
+        assert_eq!(get_ascii_from_key("a"), b'a');
+        assert_eq!(get_ascii_from_key("Z"), b'Z');
+        assert_eq!(get_ascii_from_key("0"), b'0');
+        assert_eq!(get_ascii_from_key("space"), b' ');
+        assert_eq!(get_ascii_from_key("enter"), 0xB0);
+        assert_eq!(get_ascii_from_key("f12"), 0xCD);
+        assert_eq!(get_ascii_from_key("ctrl"), 0x80);
+        assert_eq!(get_ascii_from_key("alt_right"), 0x86);
+    }
+
+    #[test]
+    fn test_get_ascii_from_key_unknown() {
+        assert_eq!(get_ascii_from_key("unknown_key"), 0x00);
+        assert_eq!(get_ascii_from_key(""), 0x00); // Empty string
+    }
+
+    #[test]
+    fn test_generate_hotkey_command() {
+        assert_eq!(generate_hotkey_command(&["ctrl", "a"]), format!("hotkey,{},{}", 0x80, b'a'));
+        assert_eq!(generate_hotkey_command(&["f1"]), format!("hotkey,{}", 0xC2));
+    }
+
+    #[test]
+    fn test_generate_hotkey_command_empty_slice() {
+        // Note: The public `hotkey` function has a guard. This tests the generator directly.
+        assert_eq!(generate_hotkey_command(&[]), "hotkey,");
+    }
+
+
+    #[test]
+    fn test_generate_key_down_command() {
+        assert_eq!(generate_key_down_command("b"), format!("key_down,{}", b'b'));
+        assert_eq!(generate_key_down_command("esc"), format!("key_down,{}", 0xB1));
+    }
+
+    #[test]
+    fn test_generate_key_up_command() {
+        assert_eq!(generate_key_up_command("c"), format!("key_up,{}", b'c'));
+        assert_eq!(generate_key_up_command("tab"), format!("key_up,{}", 0xB3));
+    }
+
+    #[test]
+    fn test_generate_press_command() {
+        assert_eq!(generate_press_command(&["shift", "1"]), format!("press,{},{}", 0x81, b'1'));
+        assert_eq!(generate_press_command(&["enter"]), format!("press,{}", 0xB0));
+    }
+
+    #[test]
+    fn test_generate_press_command_empty_slice() {
+        // Note: The public `press` function has a guard. This tests the generator directly.
+        assert_eq!(generate_press_command(&[]), "press,");
+    }
+
+    #[test]
+    fn test_generate_write_command() {
+        assert_eq!(generate_write_command("Hello"), "write,Hello");
+        assert_eq!(generate_write_command(""), "write,"); // Empty phrase
+    }
+}
+// Based on https://www.arduino.cc/reference/en/language/functions/usb/keyboard/keyboardmodifiers/
+// and https://www.arduino.cc/reference/en/language/functions/usb/keyboard/asciichart/
+// (Content of get_ascii_from_key remains the same, just moved up due to helper functions needing it)

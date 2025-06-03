@@ -337,12 +337,43 @@ fn coordinates_are_equal(first_coordinate: (i32, i32, i32), second_coordinate: (
     first_coordinate == second_coordinate
 }
 
+use pyo3::exceptions::PyIOError; // Added for error handling
+use crate::global_app_context; // To access the global AppContext
+use crate::AppError; // To map AppError to PyErr
+
 #[pyfunction]
 fn release_keys(_py: Python, last_pressed_key: Option<String>) -> PyResult<Option<String>> {
     if let Some(key) = last_pressed_key {
-        println!("Rust: keyUp({}) would be called here (from python_utils.rs).", key);
+        let app_context = global_app_context().map_err(|e| {
+            PyIOError::new_err(format!("Failed to get global AppContext: {}", e))
+        })?;
+
+        let mut arduino_com_option_guard = app_context.arduino_com.lock().map_err(|e| {
+            PyIOError::new_err(format!("Failed to lock ArduinoCom Mutex: {}", e.to_string()))
+        })?;
+
+        if let Some(arduino_com) = arduino_com_option_guard.as_mut() {
+            match crate::input::keyboard::key_up(arduino_com, &key) {
+                Ok(_) => Ok(Some(key)),
+                Err(e) => {
+                    let py_err_msg = format!("Failed to release key '{}': {}", key, e);
+                    match e {
+                        AppError::ArduinoError(_) | AppError::InputError(_) => {
+                            Err(PyIOError::new_err(py_err_msg))
+                        }
+                        _ => Err(PyIOError::new_err(format!(
+                            "An unexpected error occurred: {}",
+                            py_err_msg
+                        ))),
+                    }
+                }
+            }
+        } else {
+            Err(PyIOError::new_err("Arduino communication is not initialized."))
+        }
+    } else {
+        Ok(None)
     }
-    Ok(None)
 }
 
 #[pymodule]
