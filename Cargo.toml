@@ -5,7 +5,8 @@ members = [
     "skb_rust_project/skb_utils",
     "skb_rust_project/skb_input",
     "skb_rust_project/skb_game_state",
-    "skb_rust_project/skb_gameplay_logic"
+    "skb_rust_project/skb_gameplay_logic",
+    "skb_rust_project/skb_action_bar"
 ]
 resolver = "2"
 
