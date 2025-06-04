@@ -1,5 +1,5 @@
 [workspace]
-members = ["skb_modules", "skb_rust_project/skb_config", "skb_rust_project/skb_utils"] # Added skb_utils to members
+members = ["skb_modules", "skb_rust_project/skb_config", "skb_rust_project/skb_utils", "skb_rust_project/skb_input"]
 resolver = "2"
 
 [package]
@@ -9,6 +9,6 @@ edition = "2021"
 
 [dependencies]
 skb_config = { path = "skb_rust_project/skb_config", version = "0.1.0" }
-skb_utils = { path = "skb_rust_project/skb_utils", version = "0.1.0" } # Added skb_utils dependency
+skb_utils = { path = "skb_rust_project/skb_utils", version = "0.1.0" }
 log = "0.4"
 env_logger = "0.10"

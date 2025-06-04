@@ -1,0 +1,14 @@
+# skb_utils/Cargo.toml
+[package]
+name = "skb_utils"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+log = "0.4"
+env_logger = "0.10" # Or a version consistent with Mfe3O if specified, 0.10 is recent
+thiserror = "1.0"
+chrono = "0.4" # For logging timestamps
+
+[dev-dependencies]
+tempfile = "3.8" # Added for tests
