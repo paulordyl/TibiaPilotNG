@@ -1,6 +1,7 @@
 import customtkinter
 from tkinter import BooleanVar
-from .pages.config import ConfigPage
+# from .pages.config import ConfigPage # Old config page
+from .pages.settings_page import SettingsPage # New settings page
 from .pages.comboSpells import ComboSpellsPage
 from .pages.inventory import InventoryPage
 from .pages.cavebot.cavebotPage import CavebotPage
@@ -17,7 +18,8 @@ class Application(customtkinter.CTk):
         self.title(genRanStr())
         self.resizable(False, False)
 
-        self.configPage = None
+        # self.configPage = None # Old config page
+        self.settingsPage = None # New settings page
         self.inventoryPage = None
         self.cavebotPage = None
         self.healingPage = None
@@ -72,10 +74,12 @@ class Application(customtkinter.CTk):
         self.checkbutton.grid(column=2, row=1, padx=20, pady=20, sticky='w')
 
     def configurationWindow(self):
-        if self.configPage is None or not self.configPage.winfo_exists():
-            self.configPage = ConfigPage(self.context)
+        if self.settingsPage is None or not self.settingsPage.winfo_exists():
+            # Pass 'self' as master for the Toplevel window
+            self.settingsPage = SettingsPage(self, self.context)
+            self.settingsPage.grab_set() # Make it modal / focus
         else:
-            self.configPage.focus()
+            self.settingsPage.focus()
 
     def inventoryWindow(self):
         if self.inventoryPage is None or not self.inventoryPage.winfo_exists():

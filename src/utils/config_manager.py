@@ -167,6 +167,23 @@ def get_config(key_path: str, default_value=None):
 # Load configuration when the module is imported
 load_config()
 
+def save_config(data_to_save: dict) -> bool:
+    """
+    Saves the provided configuration data to USER_CONFIG_PATH (config.json).
+    Updates the in-memory config_data upon successful save.
+    Returns True on success, False on failure.
+    """
+    global config_data
+    try:
+        with open(USER_CONFIG_PATH, 'w') as f:
+            json.dump(data_to_save, f, indent=4)
+        logging.info(f"Configuration successfully saved to {USER_CONFIG_PATH}")
+        config_data = data_to_save  # Update in-memory config
+        return True
+    except Exception as e:
+        logging.error(f"Error saving configuration to {USER_CONFIG_PATH}: {e}")
+        return False
+
 if __name__ == '__main__':
     # Example usage:
     print(f"Profile file path: {get_config('profile_file_path')}")
