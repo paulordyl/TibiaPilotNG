@@ -1,0 +1,17 @@
+# skb_gameplay_logic/Cargo.toml
+[package]
+name = "skb_gameplay_logic"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+thiserror = "1.0"
+log = "0.4" # Added for log::* macros
+# Path dependencies to other local skb crates:
+skb_game_state = { path = "../skb_game_state" }
+skb_input = { path = "../skb_input" }
+skb_utils = { path = "../skb_utils" }
+# skb_config = { path = "../skb_config" } # If gameplay logic needs direct config access
+
+# Optional: for more complex logic later
+# rand = "0.8" # If randomized decisions are needed
