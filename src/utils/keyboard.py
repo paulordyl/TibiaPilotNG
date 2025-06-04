@@ -1,155 +1,127 @@
-import time # Added for sleeps in hotkey, press, write
-from .ino_rs import ArduinoComm, ArduinoCommError # New import
-
-# Initialize Arduino communication
-# TODO: Port name should ideally be configurable, not hardcoded.
-# For now, using the port from the original ino.py.
-# The actual library path for libarduino_comm.so/dll will be resolved by ArduinoComm itself.
+# src/utils/keyboard.py
+import time
 try:
-    arduino_comm = ArduinoComm("COM33") 
-except ArduinoCommError as e:
-    print(f"Failed to initialize Arduino communication for keyboard: {e}")
-    # Fallback or dummy object if critical, or let it raise if arduino is essential
-    # For now, if it fails, subsequent calls will fail.
-    # A more robust app might have a dummy_arduino_comm that logs or no-ops.
-    arduino_comm = None # Or a dummy object
+    # Attempt to import the Rust extension module
+    # The actual name 'skb_input_rust' is defined in the Rust lib's #[pymodule] name attribute
+    # and the [lib] name in skb_input's Cargo.toml
+    import skb_input_rust
+    RUST_INPUT_AVAILABLE = True
+    print("Successfully imported Rust `skb_input_rust` module for keyboard.")
+except ImportError as e:
+    RUST_INPUT_AVAILABLE = False
+    print(f"Failed to import Rust `skb_input_rust` module for keyboard: {e}")
+    print("Keyboard functions will be no-ops or raise errors.")
 
-def getAsciiFromKey(key):
-    if not key:
-        return 0
+# Removed getAsciiFromKey as this logic is now in Rust string_to_enigo_key
 
-    sanitized = key.lower()
-
-    if sanitized == '?':
-        return 63
-
-    if sanitized.isalpha() and len(sanitized) == 1:
-        return ord(sanitized)
-    
-    if sanitized == 'space':
-        return 32
-    elif sanitized == 'esc':
-        return 177
-    elif sanitized == 'ctrl':
-        return 128
-    elif sanitized == 'alt':
-        return 130
-    elif sanitized == 'shift':
-        return 129
-    elif sanitized == 'enter':
-        return 176
-    elif sanitized == 'up':
-        return 218
-    elif sanitized == 'down':
-        return 217
-    elif sanitized == 'left':
-        return 216
-    elif sanitized == 'right':
-        return 215
-    elif sanitized == 'backspace':
-        return 178
-    elif sanitized == 'f1':
-        return 194
-    elif sanitized == 'f2':
-        return 195
-    elif sanitized == 'f3':
-        return 196
-    elif sanitized == 'f4':
-        return 197
-    elif sanitized == 'f5':
-        return 198
-    elif sanitized == 'f6':
-        return 199
-    elif sanitized == 'f7':
-        return 200
-    elif sanitized == 'f8':
-        return 201
-    elif sanitized == 'f9':
-        return 202
-    elif sanitized == 'f10':
-        return 203
-    elif sanitized == 'f11':
-        return 204
-    elif sanitized == 'f12':
-        return 205
-    else:
-        return 0
-
-def hotkey(*args, interval: float = 0.01): # Added interval based on original ino.py
-    if not arduino_comm:
-        print("Arduino communication not initialized for keyboard (hotkey).")
+def hotkey(*args, interval: float = 0.01):
+    if not RUST_INPUT_AVAILABLE:
+        print("Rust input module not available. Keyboard 'hotkey' will be a no-op.")
         return
-    
-    try:
-        for key in args:
-            asciiKey = getAsciiFromKey(key)
-            if asciiKey != 0:
-                raw_command_down = f"keyDown,{asciiKey}"
-                arduino_comm.send(raw_command_down)
-        
-        time.sleep(interval) # Sleep between all downs and all ups
 
-        for key in args:
-            asciiKey = getAsciiFromKey(key)
-            if asciiKey != 0:
-                raw_command_up = f"keyUp,{asciiKey}"
-                arduino_comm.send(raw_command_up)
-    except ArduinoCommError as e:
-        print(f"Error sending hotkey command: {e}")
+    try:
+        for key_str in args:
+            # Key validation (optional, Rust side also does it)
+            if not isinstance(key_str, str):
+                print(f"Hotkey: Invalid key '{key_str}', must be a string. Skipping.")
+                continue
+            skb_input_rust.send_key_event_py(key_str, True) # Press
+        
+        if interval > 0:
+            time.sleep(interval)
+
+        for key_str in args:
+            if not isinstance(key_str, str):
+                # Already warned above, but good to be safe
+                continue
+            skb_input_rust.send_key_event_py(key_str, False) # Release
+    except RuntimeError as e: # Catch PyRuntimeError from Rust
+        print(f"Error during hotkey execution: {e}")
+    except Exception as e: # Catch any other unexpected errors
+        print(f"Unexpected error during hotkey: {e}")
 
 
 def keyDown(key: str):
-    if not arduino_comm:
-        print("Arduino communication not initialized for keyboard (keyDown).")
+    if not RUST_INPUT_AVAILABLE:
+        print("Rust input module not available. Keyboard 'keyDown' will be a no-op.")
+        return
+    if not isinstance(key, str):
+        print(f"keyDown: Invalid key '{key}', must be a string.")
         return
         
-    asciiKey = getAsciiFromKey(key)
-    if asciiKey != 0:
-        raw_command = f"keyDown,{asciiKey}"
-        try:
-            arduino_comm.send(raw_command)
-        except ArduinoCommError as e:
-            print(f"Error sending keyDown command: {e}")
+    try:
+        skb_input_rust.send_key_event_py(key, True) # Press
+    except RuntimeError as e:
+        print(f"Error during keyDown for key '{key}': {e}")
+    except Exception as e:
+        print(f"Unexpected error during keyDown for key '{key}': {e}")
+
 
 def keyUp(key: str):
-    if not arduino_comm:
-        print("Arduino communication not initialized for keyboard (keyUp).")
+    if not RUST_INPUT_AVAILABLE:
+        print("Rust input module not available. Keyboard 'keyUp' will be a no-op.")
         return
-
-    asciiKey = getAsciiFromKey(key)
-    if asciiKey != 0:
-        raw_command = f"keyUp,{asciiKey}"
-        try:
-            arduino_comm.send(raw_command)
-        except ArduinoCommError as e:
-            print(f"Error sending keyUp command: {e}")
-
-def press(*args, duration: float = 0.05): # Added duration based on original ino.py
-    if not arduino_comm:
-        print("Arduino communication not initialized for keyboard (press).")
+    if not isinstance(key, str):
+        print(f"keyUp: Invalid key '{key}', must be a string.")
         return
 
     try:
-        for key in args:
-            asciiKey = getAsciiFromKey(key)
-            if asciiKey != 0:
-                raw_command = f"press,{asciiKey}"
-                arduino_comm.send(raw_command)
-                # The sleep for 'press' in original ino.py was after arduinoSerial.write()
-                # and specific to each key press in the loop.
-                time.sleep(duration) 
-    except ArduinoCommError as e:
-        print(f"Error sending press command: {e}")
+        skb_input_rust.send_key_event_py(key, False) # Release
+    except RuntimeError as e:
+        print(f"Error during keyUp for key '{key}': {e}")
+    except Exception as e:
+        print(f"Unexpected error during keyUp for key '{key}': {e}")
 
-def write(phrase: str, delayBetweenPresses: float = 0.01): # Added delay based on original ino.py
-    if not arduino_comm:
-        print("Arduino communication not initialized for keyboard (write).")
+
+def press(*args, duration: float = 0.05):
+    """
+    Simulates pressing and releasing key(s) with a short delay in between.
+    The 'duration' here is the time the key is held down (press followed by release).
+    """
+    if not RUST_INPUT_AVAILABLE:
+        print("Rust input module not available. Keyboard 'press' will be a no-op.")
         return
 
-    raw_command = f"write,{phrase}"
     try:
-        arduino_comm.send(raw_command)
-        # The sleep for 'write' in original ino.py was after arduinoSerial.write()
-        time.sleep(delayBetweenPresses * len(phrase)) 
-    except ArduinoCommError as e:
-        print(f"Error sending write command: {e}")
+        for key_str in args:
+            if not isinstance(key_str, str):
+                print(f"Press: Invalid key '{key_str}', must be a string. Skipping.")
+                continue
+            skb_input_rust.send_key_event_py(key_str, True) # Press
+            if duration > 0:
+                time.sleep(duration) # Hold duration
+            skb_input_rust.send_key_event_py(key_str, False) # Release
+            # Original ino.py had a sleep *after* each "press" command from Arduino.
+            # If that behavior is desired (a pause *between* distinct key presses in the *args sequence),
+            # another small sleep could be added here, outside the press/release pair.
+            # For now, this matches holding a single key for `duration`.
+    except RuntimeError as e:
+        print(f"Error during press execution: {e}")
+    except Exception as e:
+        print(f"Unexpected error during press: {e}")
+
+
+def write(phrase: str, delayBetweenPresses: float = 0.01): # delayBetweenPresses is now more of a post-write delay
+    if not RUST_INPUT_AVAILABLE:
+        print("Rust input module not available. Keyboard 'write' will be a no-op.")
+        return
+    if not isinstance(phrase, str):
+        print(f"Write: Invalid phrase '{phrase}', must be a string.")
+        return
+
+    try:
+        skb_input_rust.type_text_py(phrase)
+        # The original 'delayBetweenPresses' was tied to Arduino's serial write.
+        # enigo's type_text is blocking and types the whole phrase.
+        # If a delay is still needed *after* typing the phrase, we can use it here.
+        # A per-character delay would need a char-by-char loop calling type_text_py(char)
+        # or send_key_event_py for each char, which is less efficient than type_text_py for phrases.
+        if delayBetweenPresses > 0 and len(phrase) > 0 : # Check len(phrase) to avoid sleep if empty
+             # The original sleep was delayBetweenPresses * len(phrase).
+             # Let's just use a single delayBetweenPresses as a pause after typing.
+             # If a longer, phrase-dependent delay is needed, adjust this.
+            time.sleep(delayBetweenPresses)
+    except RuntimeError as e:
+        print(f"Error during write for phrase '{phrase}': {e}")
+    except Exception as e:
+        print(f"Unexpected error during write for phrase '{phrase}': {e}")

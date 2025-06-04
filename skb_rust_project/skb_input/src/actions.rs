@@ -5,16 +5,20 @@
 //! `InputError::SimulationError`.
 
 use crate::error::InputError;
-use enigo::{Enigo, Key as EnigoKey, MouseButton as EnigoMouseButton, Keyboard, Mouse, Settings as EnigoSettings, Coordinate};
-// use std::sync::Mutex; // Currently unused, can be re-added if a shared Enigo instance is implemented
+// Corrected imports for enigo 0.2.0
+use enigo::{
+    Enigo,
+    Key, // Direct use of Key
+    Button, // Direct use of Button
+    Keyboard, // Trait for keyboard methods
+    Mouse,    // Trait for mouse methods
+    Settings as EnigoSettings,
+    Coordinate,
+    Direction, // For key/button press/release/click
+    Axis       // For scroll direction
+};
 
-// Use lazy_static or once_cell for a global Enigo instance.
-// For this subtask, to keep dependencies minimal for skb_input for now,
-// we will create an Enigo instance per call. This might be less efficient
-// if rapidly calling input functions. A shared instance would be an optimization.
-// However, Enigo::new() can fail, so we need to handle that.
-
-/// Helper function to create a new Enigo instance.
+// Helper function to create a new Enigo instance.
 /// Not public as action functions encapsulate its use.
 fn get_enigo_instance() -> Result<Enigo, InputError> {
     Enigo::new(&EnigoSettings::default())
@@ -26,21 +30,17 @@ fn get_enigo_instance() -> Result<Enigo, InputError> {
 /// Sends a key event (press or release) for the specified key.
 ///
 /// # Arguments
-/// * `key` - The `EnigoKey` (re-exported from `enigo` by `skb_input::lib`) to simulate.
+/// * `key` - The `enigo::Key` to simulate.
 /// * `is_press` - `true` for a key press, `false` for a key release.
 ///
 /// # Errors
 /// Returns `InputError::SimulationError` if the Enigo instance cannot be initialized
 /// or if the underlying input simulation fails.
-pub fn send_key_event(key: EnigoKey, is_press: bool) -> Result<(), InputError> {
+pub fn send_key_event(key: Key, is_press: bool) -> Result<(), InputError> {
     let mut enigo = get_enigo_instance()?;
-    if is_press {
-        enigo.key(key, enigo::Direction::Press)
-            .map_err(|e| InputError::SimulationError(format!("Failed to press key {:?}: {}", key, e)))?;
-    } else {
-        enigo.key(key, enigo::Direction::Release)
-            .map_err(|e| InputError::SimulationError(format!("Failed to release key {:?}: {}", key, e)))?;
-    }
+    let direction = if is_press { Direction::Press } else { Direction::Release };
+    enigo.key(key, direction) // Uses Keyboard trait method
+        .map_err(|e| InputError::SimulationError(format!("Failed to send key_event for {:?}, direction {:?}: {}", key, direction, e)))?;
     Ok(())
 }
 
@@ -59,10 +59,7 @@ pub fn send_key_event(key: EnigoKey, is_press: bool) -> Result<(), InputError> {
 /// or if the underlying input simulation fails.
 pub fn type_text(text: &str) -> Result<(), InputError> {
     let mut enigo = get_enigo_instance()?;
-    // enigo.text() is a convenience that handles individual key presses/releases for chars.
-    // It may not support all special characters or unicode sequences perfectly on all platforms via this method.
-    // For more complex text or specific character control, manual key event sequences might be needed.
-    enigo.text(text)
+    enigo.text(text) // Uses Keyboard trait method
         .map_err(|e| InputError::SimulationError(format!("Failed to type text: {}", e)))?;
     Ok(())
 }
@@ -80,7 +77,7 @@ pub fn type_text(text: &str) -> Result<(), InputError> {
 /// or if the underlying input simulation fails.
 pub fn move_mouse_abs(x: i32, y: i32) -> Result<(), InputError> {
     let mut enigo = get_enigo_instance()?;
-    enigo.move_mouse(x, y, Coordinate::Abs)
+    enigo.move_mouse(x, y, Coordinate::Abs) // Uses Mouse trait method
         .map_err(|e| InputError::SimulationError(format!("Failed to move mouse to ({}, {}): {}", x, y, e)))?;
     Ok(())
 }
@@ -96,7 +93,7 @@ pub fn move_mouse_abs(x: i32, y: i32) -> Result<(), InputError> {
 /// or if the underlying input simulation fails.
 pub fn move_mouse_rel(dx: i32, dy: i32) -> Result<(), InputError> {
     let mut enigo = get_enigo_instance()?;
-    enigo.move_mouse(dx, dy, Coordinate::Rel)
+    enigo.move_mouse(dx, dy, Coordinate::Rel) // Uses Mouse trait method
         .map_err(|e| InputError::SimulationError(format!("Failed to move mouse by ({}, {}): {}", dx, dy, e)))?;
     Ok(())
 }
@@ -104,44 +101,36 @@ pub fn move_mouse_rel(dx: i32, dy: i32) -> Result<(), InputError> {
 /// Sends a mouse button event (press or release) for the specified button.
 ///
 /// # Arguments
-/// * `button` - The `EnigoMouseButton` (re-exported from `enigo` by `skb_input::lib`) to simulate.
+/// * `button` - The `enigo::Button` to simulate.
 /// * `is_press` - `true` for a button press, `false` for a button release.
 ///
 /// # Errors
 /// Returns `InputError::SimulationError` if the Enigo instance cannot be initialized
 /// or if the underlying input simulation fails.
-pub fn send_mouse_button_event(button: EnigoMouseButton, is_press: bool) -> Result<(), InputError> {
+pub fn send_mouse_button_event(button: Button, is_press: bool) -> Result<(), InputError> {
     let mut enigo = get_enigo_instance()?;
-    if is_press {
-        enigo.button(button, enigo::Direction::Press)
-            .map_err(|e| InputError::SimulationError(format!("Failed to press mouse button {:?}: {}", button, e)))?;
-    } else {
-        enigo.button(button, enigo::Direction::Release)
-            .map_err(|e| InputError::SimulationError(format!("Failed to release mouse button {:?}: {}", button, e)))?;
-    }
+    let direction = if is_press { Direction::Press } else { Direction::Release };
+    enigo.button(button, direction) // Uses Mouse trait method
+        .map_err(|e| InputError::SimulationError(format!("Failed to send button_event for {:?}, direction {:?}: {}", button, direction, e)))?;
     Ok(())
 }
 
 /// Simulates a click (press followed by release) of the specified mouse button.
 ///
 /// # Arguments
-/// * `button` - The `EnigoMouseButton` (re-exported from `enigo` by `skb_input::lib`) to click.
+/// * `button` - The `enigo::Button` to click.
 ///
 /// # Errors
 /// Returns `InputError::SimulationError` if the Enigo instance cannot be initialized
 /// or if the underlying input simulation fails.
-pub fn click_mouse(button: EnigoMouseButton) -> Result<(), InputError> {
+pub fn click_mouse(button: Button) -> Result<(), InputError> {
     let mut enigo = get_enigo_instance()?;
-    // Enigo's `click` method combines press and release.
-    enigo.click(button)
+    enigo.button(button, Direction::Click) // Uses Mouse trait method, with Direction::Click
         .map_err(|e| InputError::SimulationError(format!("Failed to click mouse button {:?}: {}", button, e)))?;
     Ok(())
 }
 
-/// Scrolls the mouse wheel.
-///
-/// The scroll amounts are relative. Positive `y_amount` usually scrolls down,
-/// positive `x_amount` usually scrolls right, but behavior can be OS/application dependent.
+/// Scrolls the mouse wheel. Positive `y_amount` scrolls "down", positive `x_amount` scrolls "right".
 ///
 /// # Arguments
 /// * `x_amount` - The amount to scroll horizontally.
@@ -149,40 +138,36 @@ pub fn click_mouse(button: EnigoMouseButton) -> Result<(), InputError> {
 ///
 /// # Errors
 /// Returns `InputError::SimulationError` if the Enigo instance cannot be initialized
-/// or if the underlying input simulation fails.
+/// or if the underlying input simulation fails for either axis.
 pub fn scroll_mouse_wheel(x_amount: i32, y_amount: i32) -> Result<(), InputError> {
     let mut enigo = get_enigo_instance()?;
-    enigo.scroll(x_amount, y_amount, Coordinate::Rel) // Assuming scroll is relative
-         .map_err(|e| InputError::SimulationError(format!("Failed to scroll mouse wheel by ({},{}): {}", x_amount, y_amount, e)))?;
+    if y_amount != 0 {
+        enigo.scroll(y_amount, Axis::Vertical) // Uses Mouse trait method
+             .map_err(|e| InputError::SimulationError(format!("Failed to scroll mouse vertically by {}: {}", y_amount, e)))?;
+    }
+    if x_amount != 0 {
+        enigo.scroll(x_amount, Axis::Horizontal) // Uses Mouse trait method
+             .map_err(|e| InputError::SimulationError(format!("Failed to scroll mouse horizontally by {}: {}", x_amount, e)))?;
+    }
     Ok(())
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    // Re-import EnigoKey and EnigoMouseButton if they are not already in super's scope
-    // or qualify them, e.g. enigo::Key::A.
-    // The lib.rs re-exports them, but actions.rs itself might not have them directly in scope.
-    // For simplicity in this test module, let's assume we can access them.
-    // If not, we'd use crate::EnigoKey or similar.
-    // Let's use the direct enigo types here as our functions take them.
-    use enigo::{Key as EnigoKeyTest, MouseButton as EnigoMouseButtonTest}; // Renamed to avoid conflict if EnigoKey/MouseButton are brought into scope by `use super::*` already. Or, just use super::EnigoKey.
-                                                                    // Actually, the functions take EnigoKey and EnigoMouseButton which are already aliased in the outer scope.
-                                                                    // So, direct use of EnigoKey, EnigoMouseButton should be fine.
+    // Test with direct enigo types as they are used in function signatures now
+    // No need for EnigoKeyTest alias if Key is imported directly.
 
-    // Test for Enigo instance creation
     #[test]
     fn test_get_enigo_instance_smoke() {
-        // This test might fail on headless CI servers if Enigo::new() needs a display.
-        // If it does, this test might need to be cfg'd out for such environments.
         match get_enigo_instance() {
             Ok(_) => println!("Enigo instance created successfully (or would be)."),
             Err(e) => {
-                // Allow specific error if no display, otherwise panic
                 let err_msg = e.to_string();
-                if err_msg.contains("Failed to initialize Enigo") && (err_msg.contains("Wayland") || err_msg.contains("X11") || err_msg.contains("windows") || err_msg.contains("macos") || err_msg.contains("Cannot connect to server") || err_msg.contains("No protocol specified")) {
-                    // This error is common in headless environments. Consider it a pass for smoke test.
-                    // Or use #[ignore] for this test in CI.
+                if err_msg.contains("Failed to initialize Enigo") &&
+                   (err_msg.contains("Wayland") || err_msg.contains("X11") ||
+                    err_msg.contains("windows") || err_msg.contains("macos") ||
+                    err_msg.contains("Cannot connect to server") || err_msg.contains("No protocol specified")) {
                     println!("Enigo instantiation failed as expected in headless environment: {}", e);
                 } else {
                     panic!("get_enigo_instance failed unexpectedly: {}", e);
@@ -191,21 +176,15 @@ mod tests {
         }
     }
 
-    // Smoke tests for each public input function
-    // These primarily check that the function call completes without panic
-    // and returns Ok. They don't verify actual input simulation.
-
     #[test]
     fn test_send_key_event_smoke() {
-        // This test will likely fail if no display server is available (e.g., on CI)
-        // because get_enigo_instance() will fail.
-        // Consider #[ignore] for CI or conditional compilation.
         if get_enigo_instance().is_err() {
             println!("Skipping test_send_key_event_smoke due to Enigo initialization failure (likely headless).");
             return;
         }
-        assert!(send_key_event(EnigoKey::A, true).is_ok());
-        assert!(send_key_event(EnigoKey::A, false).is_ok());
+        // Use an actual Key variant, e.g. Key::Layout for characters
+        assert!(send_key_event(Key::Layout('a'), true).is_ok());
+        assert!(send_key_event(Key::Layout('a'), false).is_ok());
     }
 
     #[test]
@@ -241,8 +220,8 @@ mod tests {
             println!("Skipping test_send_mouse_button_event_smoke due to Enigo initialization failure (likely headless).");
             return;
         }
-        assert!(send_mouse_button_event(EnigoMouseButton::Left, true).is_ok());
-        assert!(send_mouse_button_event(EnigoMouseButton::Left, false).is_ok());
+        assert!(send_mouse_button_event(Button::Left, true).is_ok());
+        assert!(send_mouse_button_event(Button::Left, false).is_ok());
     }
 
     #[test]
@@ -251,7 +230,7 @@ mod tests {
             println!("Skipping test_click_mouse_smoke due to Enigo initialization failure (likely headless).");
             return;
         }
-        assert!(click_mouse(EnigoMouseButton::Right).is_ok());
+        assert!(click_mouse(Button::Right).is_ok());
     }
 
     #[test]
@@ -262,5 +241,6 @@ mod tests {
         }
         assert!(scroll_mouse_wheel(0, 1).is_ok()); // Scroll down
         assert!(scroll_mouse_wheel(1, 0).is_ok()); // Scroll right
+        assert!(scroll_mouse_wheel(1, 1).is_ok()); // Scroll both
     }
 }
