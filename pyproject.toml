@@ -4,6 +4,7 @@ version = "0.1.0"
 description = ""
 authors = ["Paulo Lacerda <paulorl2810@gmail.com>", "lucasmonstro <joao.galiano.silva@gmail.com>"]
 readme = "README.md"
+packages = [{include = "src"}]
 
 [tool.poetry.dependencies]
 dxcam = {git = "https://github.com/paulordyl/DXcam"}
@@ -17,8 +18,8 @@ opencv-python = "^4.8.0"
 pillow = "^9.1.1"
 pyautogui = "^0.9.53"
 pygetwindow = "^0.0.9"
-python = "3.11.7"
-pywin32 = "^306"
+python = ">=3.11,<3.12"
+pywin32 = {version = "^306", platform = "win32"}
 scipy = "^1.9.1"
 tcod = "^13.8.1"
 tinydb = "^4.8.0"

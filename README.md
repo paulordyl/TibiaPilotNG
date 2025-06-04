@@ -131,6 +131,35 @@ poetry install
 poetry run python main.py
 ```
 
+## 📦 Running from Executable
+
+Alternatively, you can build and run the application from a standalone executable.
+
+### Building the Executable
+
+1.  Ensure you have all development dependencies installed:
+    ```bash
+    poetry install
+    ```
+2.  Run PyInstaller to build the executable using the provided spec file:
+    ```bash
+    poetry run pyinstaller pilotng.spec
+    ```
+    This command will create a `dist` folder in the root of the project, containing the executable and its associated files.
+
+### Running the Executable
+
+-   **On Linux:**
+    Open your terminal, navigate to the project's root directory, and run:
+    ```bash
+    dist/pilotng
+    ```
+-   **On Windows:**
+    Open Command Prompt or PowerShell, navigate to the project's root directory, and run:
+    ```bash
+    dist\pilotng.exe
+    ```
+
 ## 🤝 Contributing
 
 Contributions are always welcome! Create a pull request xD
