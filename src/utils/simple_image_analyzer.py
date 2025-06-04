@@ -2,19 +2,18 @@
 import cv2
 import numpy as np
 
-def find_largest_color_area(
+def find_largest_object_by_hsv(
     frame: np.ndarray,
-    target_hsv_lower: np.ndarray,
-    target_hsv_upper: np.ndarray,
-    min_contour_area: int = 100 # Optional: minimum area to consider a contour valid
-    ) -> tuple[int, int] | None:
+    hsv_ranges: list[tuple[np.ndarray, np.ndarray]],
+    min_contour_area: int = 100
+) -> tuple[int, int] | None:
     """
-    Finds the largest continuous area of a specified color in an image.
+    Finds the largest continuous area matching any of the specified HSV color ranges.
 
     Args:
         frame (np.ndarray): The input image in RGB format.
-        target_hsv_lower (np.ndarray): The lower bound of the target color in HSV.
-        target_hsv_upper (np.ndarray): The upper bound of the target color in HSV.
+        hsv_ranges (list[tuple[np.ndarray, np.ndarray]]): A list of HSV range tuples.
+            Each tuple should contain (lower_bound_hsv_array, upper_bound_hsv_array).
         min_contour_area (int): Minimum area for a contour to be considered.
 
     Returns:
@@ -29,12 +28,28 @@ def find_largest_color_area(
         print(f"Warning: Input frame must be an RGB NumPy array (shape HxWx3). Got shape {frame.shape if isinstance(frame, np.ndarray) else type(frame)}")
         return None
 
+    if not hsv_ranges:
+        print("Warning: hsv_ranges list is empty. No color to detect.")
+        return None
+
     hsv_frame = cv2.cvtColor(frame, cv2.COLOR_RGB2HSV)
 
-    # Create a mask for the target color
-    # Note: For colors like red that wrap around the hue spectrum (0-10 and 170-180),
-    # two masks might be needed and then combined. This function assumes a single range.
-    mask = cv2.inRange(hsv_frame, target_hsv_lower, target_hsv_upper)
+    combined_mask = None
+    for lower_bound, upper_bound in hsv_ranges:
+        if not (isinstance(lower_bound, np.ndarray) and isinstance(upper_bound, np.ndarray)):
+            print(f"Warning: HSV range item {(lower_bound, upper_bound)} is not a tuple of NumPy arrays. Skipping this range.")
+            continue
+        individual_mask = cv2.inRange(hsv_frame, lower_bound, upper_bound)
+        if combined_mask is None:
+            combined_mask = individual_mask
+        else:
+            combined_mask = cv2.bitwise_or(combined_mask, individual_mask)
+
+    if combined_mask is None: # Could happen if hsv_ranges was empty or all items were invalid
+        print("Warning: No valid HSV ranges provided or mask could not be created.")
+        return None
+
+    mask = combined_mask
 
     # Optional: Morphological operations to reduce noise and connect regions
     # kernel = np.ones((5, 5), np.uint8)
@@ -55,101 +70,71 @@ def find_largest_color_area(
             largest_contour = contour
 
     if largest_contour is not None:
-        # Calculate the center of the contour using moments
         M = cv2.moments(largest_contour)
-        if M["m00"] != 0: # Avoid division by zero
+        if M["m00"] != 0:
             center_x = int(M["m10"] / M["m00"])
             center_y = int(M["m01"] / M["m00"])
             return center_x, center_y
         else:
-            # Fallback if m00 is zero (e.g. extremely small contour not filtered by area, or a line)
             x, y, w, h = cv2.boundingRect(largest_contour)
             return x + w // 2, y + h // 2
 
     return None
 
 if __name__ == '__main__':
-    # Example Usage (requires an image file 'test_image.png' with some red)
-    # Create a dummy frame for basic testing if no image is available.
-    # This is not a unit test, just a simple execution check.
+    print("Simple Image Analyzer Example (Generalized)")
+    sample_frame_main = np.zeros((300, 300, 3), dtype=np.uint8)
+    sample_frame_main[100:200, 100:200, 0] = 200
+    sample_frame_main[100:200, 100:200, 1] = 20
+    sample_frame_main[100:200, 100:200, 2] = 20
 
-    print("Simple Image Analyzer Example")
-    # Create a sample frame: 300x300, RGB, with a red square
-    sample_frame_main = np.zeros((300, 300, 3), dtype=np.uint8) # Renamed to avoid conflict
-    # Make the square red: R=200, G=20, B=20
-    sample_frame_main[100:200, 100:200, 0] = 200 # Red channel
-    sample_frame_main[100:200, 100:200, 1] = 20  # Green channel
-    sample_frame_main[100:200, 100:200, 2] = 20  # Blue channel
-    # Expected center: (150, 150) roughly (center of 100-199 is (100+199)/2 = 149.5)
+    # Define HSV ranges for red
+    # Range 1 (more vibrant red)
+    lower_red1 = np.array([0, 100, 100])
+    upper_red1 = np.array([10, 255, 255])
+    # Range 2 (for reds that wrap around hue spectrum)
+    lower_red2 = np.array([170, 100, 100])
+    upper_red2 = np.array([179, 255, 255])
 
-    # Define HSV range for red (example - might need tuning)
-    # OpenCV Hue values are typically 0-179 for 8-bit images.
-    # Lower bound for red (around hue 0-10)
-    lower_red1_main = np.array([0, 100, 100])    # Low H, Med S, Med V
-    upper_red1_main = np.array([10, 255, 255])   # High H, High S, High V
+    RED_HSV_RANGES = [
+        (lower_red1, upper_red1),
+        (lower_red2, upper_red2)
+    ]
 
-    # Lower bound for red (around hue 170-180, for colors that wrap around)
-    lower_red2_main = np.array([170, 100, 100])
-    upper_red2_main = np.array([179, 255, 255]) # Max Hue is 179 for 8-bit OpenCV
-
-    # --- Test with first red range ---
-    print(f"Looking for primary red range (0-10 Hue)...")
-    center_coords1_main = find_largest_color_area(sample_frame_main, lower_red1_main, upper_red1_main, min_contour_area=50)
-    if center_coords1_main:
-        print(f"Largest red area (range 1) found at: {center_coords1_main}")
-        # Expected: (149, 149) or (150, 150) depending on exact moment calculation for a square
+    print(f"Looking for red object using combined HSV ranges...")
+    # The sample red (R=200, G=20, B=20) has Hue near 0.
+    # It should be found by the first range in RED_HSV_RANGES.
+    center_coords = find_largest_object_by_hsv(sample_frame_main, RED_HSV_RANGES, min_contour_area=50)
+    if center_coords:
+        print(f"Largest red object found at: {center_coords}")
     else:
-        print("No significant red area (range 1) found.")
+        print("No significant red object found.")
 
-    # --- Test with second red range (should not find the sample red) ---
-    # The sample red (R=200, G=20, B=20) has a Hue close to 0.
-    # This second range (170-179 Hue) should NOT find it.
-    print(f"Looking for secondary red range (170-179 Hue)...")
-    center_coords2_main = find_largest_color_area(sample_frame_main, lower_red2_main, upper_red2_main, min_contour_area=50)
-    if center_coords2_main:
-        print(f"Largest red area (range 2) found at: {center_coords2_main}")
+    # Test with an empty list of ranges
+    print("Testing with empty HSV ranges list...")
+    coords_empty_ranges = find_largest_object_by_hsv(sample_frame_main, [], min_contour_area=50)
+    if coords_empty_ranges is None:
+        print("Correctly returned None for empty HSV ranges.")
     else:
-        print("No significant red area (range 2) found.")
+        print(f"Error: Expected None for empty HSV ranges, got {coords_empty_ranges}")
 
-    # Example of how to display (if you have cv2 windowing available and uncomment cv2 calls):
-    # if center_coords1_main:
-    #   frame_to_show = sample_frame_main.copy() # Avoid drawing on original if reused
-    #   cv2.circle(frame_to_show, center_coords1_main, 7, (0,255,0), -1) # Green circle
-    #   # OpenCV uses BGR for display, so convert RGB frame to BGR
-    #   cv2.imshow("Frame with Red Dot", cv2.cvtColor(frame_to_show, cv2.COLOR_RGB2BGR))
-    #   cv2.waitKey(0)
-    #   cv2.destroyAllWindows()
+    # Test with invalid item in ranges list
+    print("Testing with invalid item in HSV ranges list...")
+    invalid_ranges = [(np.array([0,0,0]), "not an array")] # type: ignore
+    coords_invalid_item = find_largest_object_by_hsv(sample_frame_main, invalid_ranges, min_contour_area=50)
+    if coords_invalid_item is None: # Should still be None as the valid ranges part might be empty or not produce a result
+        print("Returned None for list with invalid item (or no object found with valid part).")
+    else:
+        print(f"Found object at {coords_invalid_item} despite invalid item in ranges (check logic).")
+
 
     # Test with an empty frame
     print("Testing with an empty frame...")
     empty_frame = np.array([])
-    coords_empty = find_largest_color_area(empty_frame, lower_red1_main, upper_red1_main)
+    coords_empty = find_largest_object_by_hsv(empty_frame, RED_HSV_RANGES) # type: ignore
     if coords_empty is None:
         print("Correctly returned None for empty frame.")
     else:
         print(f"Error: Expected None for empty frame, got {coords_empty}")
 
-    # Test with a frame of wrong shape/type
-    print("Testing with a wrong shape frame (2D grayscale)...")
-    wrong_shape_frame = np.zeros((100,100), dtype=np.uint8)
-    coords_wrong_shape = find_largest_color_area(wrong_shape_frame, lower_red1_main, upper_red1_main)
-    if coords_wrong_shape is None:
-        print("Correctly returned None for wrong shape frame.")
-    else:
-        print(f"Error: Expected None for wrong shape frame, got {coords_wrong_shape}")
-
-    print("Testing with a frame of correct shape but wrong type (float)...")
-    float_frame = np.zeros((100,100,3), dtype=np.float32)
-    # cvtColor would raise error here if not uint8. Our check is for ndim/shape[2]
-    # The cv2.cvtColor itself will handle the type error for non-uint8 input for RGB2HSV.
-    # Let's see if our basic check catches it or if cvtColor's error is the primary gate.
-    # The function expects uint8 for image processing.
-    # The check `frame.ndim != 3 or frame.shape[2] != 3` doesn't check dtype.
-    # cv2.cvtColor will raise: cv2.error: OpenCV(4.x.x) ...Unsupported combination of source format (=5) and destination format (=2)
-    # It's fine to let cv2 handle this, or add an explicit dtype check.
-    # For now, the current checks are as per implementation.
-    # coords_float_frame = find_largest_color_area(float_frame, lower_red1_main, upper_red1_main)
-    # This would likely error out in cvtColor, which is acceptable.
-    # For robustness, one might add `and frame.dtype == np.uint8` to the check.
-    # The prompt didn't specify such strict type checking beyond shape.
     print("Finished example executions.")
