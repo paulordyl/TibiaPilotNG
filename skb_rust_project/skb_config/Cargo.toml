@@ -1,0 +1,11 @@
+# skb_config/Cargo.toml
+[package]
+name = "skb_config"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+serde = { version = "1.0", features = ["derive"] }
+config-rs = { version = "0.13", features = ["toml"] } # Using 'config-rs' as the crate name
+thiserror = "1.0"
+log = "0.4"

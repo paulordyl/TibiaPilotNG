@@ -1,7 +1,14 @@
-workspace = { members = ["skb_modules"] }
+[workspace]
+members = ["skb_modules", "skb_rust_project/skb_config", "skb_rust_project/skb_utils"] # Added skb_utils to members
+resolver = "2"
+
 [package]
 name = "skb"
 version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+skb_config = { path = "skb_rust_project/skb_config", version = "0.1.0" }
+skb_utils = { path = "skb_rust_project/skb_utils", version = "0.1.0" } # Added skb_utils dependency
+log = "0.4"
+env_logger = "0.10"
