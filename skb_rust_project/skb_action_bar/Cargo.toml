@@ -1,0 +1,11 @@
+# skb_action_bar/Cargo.toml
+[package]
+name = "skb_action_bar"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+thiserror = "1.0"
+# skb_input = { path = "../skb_input", optional = true } # If manager calls input
+# skb_config = { path = "../skb_config", optional = true } # For layout/config
+# serde = { version = "1.0", features = ["derive"], optional = true }
