@@ -1,0 +1,9 @@
+# skb_input/Cargo.toml
+[package]
+name = "skb_input"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+enigo = "0.2.0" # Check crates.io for the latest version of enigo
+thiserror = "1.0"
