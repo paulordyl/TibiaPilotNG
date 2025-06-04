@@ -1,5 +1,5 @@
 [workspace]
-members = ["skb_modules", "skb_rust_project/skb_config", "skb_rust_project/skb_utils", "skb_rust_project/skb_input"]
+members = ["skb_modules", "skb_rust_project/skb_config", "skb_rust_project/skb_utils", "skb_rust_project/skb_input", "skb_rust_project/skb_game_state"]
 resolver = "2"
 
 [package]
