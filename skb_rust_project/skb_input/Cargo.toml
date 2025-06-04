@@ -1,9 +1,15 @@
 # skb_input/Cargo.toml
 [package]
-name = "skb_input"
+name = "skb_input" # This is the Rust crate name
 version = "0.1.0"
 edition = "2021"
+
+[lib]
+name = "skb_input_rust" # Sets the output filename (e.g., skb_input_rust.so)
+                           # and is the name Python's import mechanism might look for by default.
+crate-type = ["cdylib"]
 
 [dependencies]
 enigo = "0.2.0" # Check crates.io for the latest version of enigo
 thiserror = "1.0"
+pyo3 = { version = "0.20.0", features = ["macros", "extension-module"] }
