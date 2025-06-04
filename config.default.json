@@ -1,0 +1,102 @@
+{
+    "profile_file_path": "file.json",
+    "backpacks": [
+        "25 Years Backpack",
+        "Anniversary Backpack",
+        "Beach Backpack",
+        "Birthday Backpack",
+        "Brocade Backpack",
+        "Buggy Backpack",
+        "Cake Backpack",
+        "Camouflage Backpack",
+        "Crown Backpack",
+        "Crystal Backpack",
+        "Deepling Backpack",
+        "Demon Backpack",
+        "Dragon Backpack",
+        "Expedition Backpack",
+        "Fur Backpack",
+        "Glooth Backpack",
+        "Heart Backpack",
+        "Minotaur Backpack",
+        "Moon Backpack",
+        "Mushroom Backpack",
+        "Pannier Backpack",
+        "Pirate Backpack",
+        "Raccoon Backpack",
+        "Santa Backpack",
+        "Wolf Backpack"
+    ],
+    "npc_keywords": {
+        "hi": "hi",
+        "potions": "potions",
+        "trade": "trade",
+        "yes": "yes",
+        "no": "no"
+    },
+    "combat_thresholds": {
+        "no_monster_stop_attack_threshold": 70
+    },
+    "keyboard_delays": {
+        "write_interval_min": 0.03,
+        "write_interval_max": 0.12,
+        "default_random_min": 0.2,
+        "default_random_max": 0.5,
+        "say_task_min": 0.3,
+        "say_task_max": 0.6
+    },
+    "refill_delays": {
+        "before_start": 1.0,
+        "after_complete": 1.0,
+        "use_hotkey_min": 0.8,
+        "use_hotkey_max": 1.2
+    },
+    "hotkeys": {
+        "eat_food": "f",
+        "shovel": "p",
+        "rope": "o",
+        "auto_hur": "t",
+        "clear_poison": "g",
+        "esc_target": "esc",
+        "hp_food": "3",
+        "mp_food": "4",
+        "tank_ring": "f11",
+        "main_ring": "f12",
+        "tank_amulet": "u",
+        "main_amulet": "i",
+        "hp_potion": "1",
+        "mp_potion": "2",
+        "critical_healing_spell": "5",
+        "light_healing_spell": "7",
+        "utura_spell": "8",
+        "utura_gran_spell": "9"
+    },
+    "game_window": {
+        "resolution_height": 1080
+    },
+    "pathfinding": {
+        "radar_x_offset": 53,
+        "radar_y_offset_start": 54,
+        "radar_y_offset_end": 55,
+        "astar_diagonal_cost": 0,
+        "move_action_offset": 2
+    },
+    "ui_defaults": {
+        "combo_spell_name": "Default",
+        "combo_spell_creature_compare": "lessThan",
+        "combo_spell_creature_value": 5,
+        "waypoint_direction": "center",
+        "combo_spell_current_index_reset_on_load": true
+    },
+    "chat_tabs": {
+        "local_chat": "local chat"
+    },
+    "slots": {
+        "tank_ring": 21,
+        "main_ring": 22,
+        "tank_amulet": 23,
+        "main_amulet": 24,
+        "hp_potion": 1,
+        "mp_potion": 2
+    }
+}

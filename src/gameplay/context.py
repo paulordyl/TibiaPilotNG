@@ -1,5 +1,5 @@
 from src.gameplay.core.tasks.orchestrator import TasksOrchestrator
-
+from src.utils.config_manager import get_config
 
 context = {
     'ng_backpacks': {
@@ -129,8 +129,8 @@ context = {
         },
         'eatFood': {
             'enabled': False,
-            'hotkey': 'f',
-            'eatWhenFoodIslessOrEqual': 0,
+            'hotkey': get_config('hotkeys.eat_food', 'f'),
+            'eatWhenFoodIslessOrEqual': 0, # This could be configurable too, e.g., 'eat_food_threshold'
         }
     },
     'loot': {
@@ -143,7 +143,7 @@ context = {
         'previousCoordinate': None,
         'lastCoordinateVisited': None,
     },
-    'ng_resolution': 1080,
+    'ng_resolution': get_config('game_window.resolution_height', 1080),
     'ng_statusBar': {
         'hpPercentage': None,
         'hp': None,
@@ -157,13 +157,13 @@ context = {
         'hasIgnorableCreatures': False,
     },
     'general_hotkeys': {
-        'shovel_hotkey': 'p',
-        'rope_hotkey': 'o',
+        'shovel_hotkey': get_config('hotkeys.shovel', 'p'),
+        'rope_hotkey': get_config('hotkeys.rope', 'o'),
     },
     'auto_hur': {
         'enabled': False,
-        'hotkey': 't',
-        'spell': 'utani hur',
+        'hotkey': get_config('hotkeys.auto_hur', 't'),
+        'spell': 'utani hur', # Could be configurable: get_config('spells.auto_hur', 'utani hur')
         'pz': False
     },
     'statsBar': {
@@ -178,7 +178,7 @@ context = {
     },
     'clear_stats': {
         'poison': False,
-        'poison_hotkey': 'g'
+        'poison_hotkey': get_config('hotkeys.clear_poison', 'g')
     },
     'ignorable_creatures': [],
     'ng_tasksOrchestrator': TasksOrchestrator(),

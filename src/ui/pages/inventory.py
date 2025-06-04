@@ -1,35 +1,20 @@
 from tkinter import messagebox
 import customtkinter
 from ..utils import genRanStr
+from src.utils.config_manager import get_config
 
 class InventoryPage(customtkinter.CTkToplevel):
-    backpacks = [
-        '25 Years Backpack',
-        'Anniversary Backpack',
-        'Beach Backpack',
-        'Birthday Backpack',
-        'Brocade Backpack',
-        'Buggy Backpack',
-        'Cake Backpack',
-        'Camouflage Backpack',
-        'Crown Backpack',
-        'Crystal Backpack',
-        'Deepling Backpack',
-        'Demon Backpack',
-        'Dragon Backpack',
-        'Expedition Backpack',
-        'Fur Backpack',
-        'Glooth Backpack',
-        'Heart Backpack',
-        'Minotaur Backpack',
-        'Moon Backpack',
-        'Mushroom Backpack',
-        'Pannier Backpack',
-        'Pirate Backpack',
-        'Raccoon Backpack',
-        'Santa Backpack',
-        'Wolf Backpack',
-    ]
+    # Backpack list is now loaded from config manager
+    # Default fallback is provided in get_config if the key is missing
+    backpacks = get_config('backpacks', [
+        '25 Years Backpack', 'Anniversary Backpack', 'Beach Backpack', 'Birthday Backpack',
+        'Brocade Backpack', 'Buggy Backpack', 'Cake Backpack', 'Camouflage Backpack',
+        'Crown Backpack', 'Crystal Backpack', 'Deepling Backpack', 'Demon Backpack',
+        'Dragon Backpack', 'Expedition Backpack', 'Fur Backpack', 'Glooth Backpack',
+        'Heart Backpack', 'Minotaur Backpack', 'Moon Backpack', 'Mushroom Backpack',
+        'Pannier Backpack', 'Pirate Backpack', 'Raccoon Backpack', 'Santa Backpack',
+        'Wolf Backpack'
+    ])
 
     def __init__(self, context):
         super().__init__()

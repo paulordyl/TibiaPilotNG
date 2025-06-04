@@ -5,10 +5,11 @@ from tkinter import messagebox
 from src.gameplay.core.load import loadContextFromConfig, loadNgCfgs
 from src.repositories.chat.core import resetOldList
 # from src.utils.core import getScreenshot
+from src.utils.config_manager import get_config
 
 
 class Context:
-    filePath: str = 'file.json'
+    filePath: str = get_config('profile_file_path', 'file.json')
 
     def __init__(self, context):
         shouldInsertProfile = not exists(self.filePath)
@@ -44,13 +45,13 @@ class Context:
                     'items': []
                 },
                 'general_hotkeys': {
-                    'shovel_hotkey': 'p',
-                    'rope_hotkey': 'o'
+                    'shovel_hotkey': get_config('hotkeys.shovel', 'p'),
+                    'rope_hotkey': get_config('hotkeys.rope', 'o')
                 },
                 'auto_hur': {
                     'enabled': False,
-                    'hotkey': 't',
-                    'spell': 'utani hur',
+                    'hotkey': get_config('hotkeys.auto_hur', 't'),
+                    'spell': 'utani hur', # Spell name might be configurable too if desired
                     'pz': False
                 },
                 'alert': {
@@ -60,46 +61,46 @@ class Context:
                 },
                 'clear_stats': {
                     'poison': False,
-                    'poison_hotkey': 'g'
+                    'poison_hotkey': get_config('hotkeys.clear_poison', 'g')
                 },
-                'ignorable_creatures': [],
+                'ignorable_creatures': [], # This list is dynamic
                 'healing': {
                     'highPriority': {
                         'healthFood': {
                             'enabled': False,
-                            'hotkey': '3',
+                            'hotkey': get_config('hotkeys.hp_food', '3'),
                             'hpPercentageLessThanOrEqual': 0,
                         },
                         'manaFood': {
                             'enabled': False,
-                            'hotkey': '4',
+                            'hotkey': get_config('hotkeys.mp_food', '4'),
                             'manaPercentageLessThanOrEqual': 0,
                         },
                         'swapRing': {
                             'enabled': False,
                             'tankRing': {
-                                'hotkey': 'f11',
+                                'hotkey': get_config('hotkeys.tank_ring', 'f11'),
                                 'hpPercentageLessThanOrEqual': 0,
-                                'slot': 21
+                                'slot': get_config('slots.tank_ring', 21)
                             },
                             'mainRing': {
-                                'hotkey': 'f12',
+                                'hotkey': get_config('hotkeys.main_ring', 'f12'),
                                 'hpPercentageGreaterThan': 0,
-                                'slot': 22
+                                'slot': get_config('slots.main_ring', 22)
                             },
                             'tankRingAlwaysEquipped': False
                         },
                         'swapAmulet': {
                             'enabled': False,
                             'tankAmulet': {
-                                'hotkey': 'u',
+                                'hotkey': get_config('hotkeys.tank_amulet', 'u'),
                                 'hpPercentageLessThanOrEqual': 0,
-                                'slot': 23
+                                'slot': get_config('slots.tank_amulet', 23)
                             },
                             'mainAmulet': {
-                                'hotkey': 'i',
+                                'hotkey': get_config('hotkeys.main_amulet', 'i'),
                                 'hpPercentageGreaterThan': 0,
-                                'slot': 24
+                                'slot': get_config('slots.main_amulet', 24)
                             },
                             'tankAmuletAlwaysEquipped': False
                         }
@@ -107,51 +108,51 @@ class Context:
                     'potions': {
                         'firstHealthPotion': {
                             'enabled': False,
-                            'hotkey': '1',
-                            'slot': 1,
+                            'hotkey': get_config('hotkeys.hp_potion', '1'),
+                            'slot': get_config('slots.hp_potion', 1),
                             'hpPercentageLessThanOrEqual': 0,
                             'manaPercentageGreaterThanOrEqual': 0,
                         },
                         'firstManaPotion': {
                             'enabled': False,
-                            'hotkey': '2',
-                            'slot': 2,
+                            'hotkey': get_config('hotkeys.mp_potion', '2'),
+                            'slot': get_config('slots.mp_potion', 2),
                             'manaPercentageLessThanOrEqual': 0,
                         },
                     },
                     'spells': {
                         'criticalHealing': {
                             'enabled': False,
-                            'hotkey': '5',
+                            'hotkey': get_config('hotkeys.critical_healing_spell', '5'),
                             'hpPercentageLessThanOrEqual': 0,
                             'manaPercentageGreaterThanOrEqual': 0,
-                            'spell': None
+                            'spell': None # Spell name could be from config
                         },
                         'lightHealing': {
                             'enabled': False,
-                            'hotkey': '7',
+                            'hotkey': get_config('hotkeys.light_healing_spell', '7'),
                             'hpPercentageLessThanOrEqual': 0,
                             'manaPercentageGreaterThanOrEqual': 0,
-                            'spell': None
+                            'spell': None # Spell name could be from config
                         },
                         'utura': {
                             'enabled': False,
-                            'hotkey': '8',
+                            'hotkey': get_config('hotkeys.utura_spell', '8'),
                             'hpPercentageLessThanOrEqual': 0,
                             'manaPercentageGreaterThanOrEqual': 0,
-                            'spell': None
+                            'spell': None # Spell name could be from config
                         },
                         'uturaGran': {
                             'enabled': False,
-                            'hotkey': '9',
+                            'hotkey': get_config('hotkeys.utura_gran_spell', '9'),
                             'hpPercentageLessThanOrEqual': 0,
                             'manaPercentageGreaterThanOrEqual': 0,
-                            'spell': None
+                            'spell': None # Spell name could be from config
                         },
                     },
                     'eatFood': {
                         'enabled': False,
-                        'hotkey': 'f',
+                        'hotkey': get_config('hotkeys.eat_food', 'f'),
                         'eatWhenFoodIslessOrEqual': 0,
                     }
                 },

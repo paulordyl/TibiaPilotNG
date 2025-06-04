@@ -17,7 +17,8 @@ a = Analysis(
         ('src/repositories/refill/images', 'src/repositories/refill/images'),
         ('src/repositories/skills/images', 'src/repositories/skills/images'),
         ('src/repositories/statsBar/images', 'src/repositories/statsBar/images'),
-        ('src/repositories/statusBar/images', 'src/repositories/statusBar/images')
+        ('src/repositories/statusBar/images', 'src/repositories/statusBar/images'),
+        ('config.default.json', '.')
     ],
     hiddenimports=[
         'numpy',

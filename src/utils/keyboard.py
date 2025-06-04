@@ -1,5 +1,6 @@
 import pyautogui
 import random
+from src.utils.config_manager import get_config
 
 PYAUTOGUI_KEY_MAP = {
     'esc': 'escape', 'ctrl': 'ctrl', 'alt': 'alt', 'shift': 'shift',
@@ -84,7 +85,9 @@ def press(*args):
 def write(phrase: str):
     # PyAutoGUI's write function handles typing strings directly.
     # No need to map individual characters for `write`.
-    interval = random.uniform(0.03, 0.12)
+    min_interval = get_config('keyboard_delays.write_interval_min', 0.03)
+    max_interval = get_config('keyboard_delays.write_interval_max', 0.12)
+    interval = random.uniform(min_interval, max_interval)
     pyautogui.write(phrase, interval=interval)
 
 # The old getAsciiFromKey function is now removed.

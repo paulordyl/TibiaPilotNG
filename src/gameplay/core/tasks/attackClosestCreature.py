@@ -4,6 +4,7 @@ from .clickInClosestCreature import ClickInClosestCreatureTask
 from .walkToTargetCreature import WalkToTargetCreatureTask
 from src.repositories.gameWindow.creatures import getNearestCreaturesCount
 import src.utils.keyboard as keyboard
+from src.utils.config_manager import get_config
 
 class AttackClosestCreatureTask(VectorTask):
     def __init__(self):
@@ -20,8 +21,9 @@ class AttackClosestCreatureTask(VectorTask):
         else:
             self.runTimesWithoutCloseMonster = 0
 
-        if self.runTimesWithoutCloseMonster >= 70:
-            keyboard.press('esc')
+        stop_attack_threshold = get_config('combat_thresholds.no_monster_stop_attack_threshold', 70)
+        if self.runTimesWithoutCloseMonster >= stop_attack_threshold:
+            keyboard.press(get_config('hotkeys.esc_target', 'esc'))
             return True
 
         return False
