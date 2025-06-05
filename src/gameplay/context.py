@@ -138,6 +138,7 @@ context = {
     },
     'ng_lastPressedKey': None,
     'ng_pause': True,
+    'ng_spellSequences': {}, # Added new key for spell sequences
     'ng_radar': {
         'coordinate': None,
         'previousCoordinate': None,

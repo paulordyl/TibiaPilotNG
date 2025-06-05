@@ -423,13 +423,61 @@ class CavebotPage(customtkinter.CTkToplevel):
 
         if file:
             with open(file, 'r') as f:
-                self.table.delete()
-                script = json.load(f)
-                self.context.loadScript(script)
+                # Clear existing table content
+                for item in self.table.get_children():
+                    self.table.delete(item)
+
+                script_content_str = f.read()
+                errors = validate_script_content(script_content_str) # Validate before loading
+
+                if errors:
+                    max_errors_to_show = 10
+                    error_display_count = min(len(errors), max_errors_to_show)
+                    formatted_errors = "\n".join(errors[:error_display_count])
+                    if len(errors) > max_errors_to_show:
+                        formatted_errors += f"\n\n... and {len(errors) - max_errors_to_show} more errors."
+                    messagebox.showerror("Script Validation Failed", f"Loaded script contains errors and cannot be used:\n\n{formatted_errors}")
+                    # Do not load the script into context if it's invalid
+                    self.context.context['ng_cave']['waypoints']['items'] = []
+                    self.context.context['ng_spellSequences'] = {}
+                    return
+
+                script = json.loads(script_content_str) # Parse again after validation
+
+                # Initialize/clear spell sequences for the new script
+                self.context.context['ng_spellSequences'] = {}
+                executable_waypoints = []
+
                 for waypoint in script:
-                    self.table.insert('', 'end', values=(
-                        waypoint['label'], waypoint['type'], waypoint['coordinate'], waypoint['options']))
-            messagebox.showinfo('Sucesso', 'Script carregado com sucesso!')
+                    if waypoint.get('type') == 'defineSpellSequence':
+                        try:
+                            sequence_label = waypoint['options']['sequenceLabel']
+                            spells_list = waypoint['options']['spells']
+                            # TODO: Potentially deeper validation/transformation of spells_list if needed
+                            self.context.context['ng_spellSequences'][sequence_label] = spells_list
+                        except KeyError:
+                            # This should have been caught by validate_script_content, but as a safeguard:
+                            messagebox.showerror("Script Error", f"Malformed defineSpellSequence waypoint found: {waypoint.get('label', 'Unknown Label')}")
+                            # Decide if loading should halt or skip this definition
+                    else:
+                        executable_waypoints.append(waypoint)
+                        # Insert only executable waypoints into the UI table
+                        self.table.insert('', 'end', values=(
+                            waypoint.get('label', ''),
+                            waypoint.get('type', ''),
+                            waypoint.get('coordinate', [0,0,0]), # Default if missing, though validator should catch
+                            waypoint.get('options', {})
+                        ))
+
+                # Store only executable waypoints for the orchestrator
+                self.context.context['ng_cave']['waypoints']['items'] = executable_waypoints
+                # self.context.loadScript(script) # Old way, replace with direct manipulation
+
+                # Update context's internal representation of the script for saving, etc.
+                # This assumes self.context.context['ng_cave']['waypoints']['items'] is the source of truth for saving.
+                # If a separate "original full script" is needed, store `script` there.
+
+            messagebox.showinfo('Sucesso', 'Script loaded and parsed successfully!')
 
     def validate_current_script(self):
         current_script_data = self.context.context['ng_cave']['waypoints']['items']
