@@ -18,8 +18,141 @@ Below I'll leave some images and videos of how it worked, prints of the bot's UI
 
 ## 📝 CAVEBOT SCRIPTS (SEE SCRIPTS FOLDER)
 
+Cavebot scripts are JSON files (with a `.pilotscript` extension) that define a sequence of actions (waypoints) for the bot to follow. You can create and edit these scripts using the Cavebot tab in the application.
+
 - DRAKEN WALLS NORTH ✔️
 - MINOTAUR CULT -1 AND -2 ✔️
+
+### Validating Your Scripts
+
+The Cavebot page includes a **"Validate Script"** button. Clicking this will check your currently loaded script for common errors, such as:
+-   Correct JSON formatting.
+-   Ensuring each waypoint has all required fields (`label`, `type`, `coordinate`, `options`, `ignore`, `passinho`).
+-   Using known waypoint `type` values.
+-   Correct structure and values within the `options` field for each waypoint type.
+-   Valid references for `waypointLabelToRedirect` in `refillChecker` waypoints.
+
+This helps catch issues before you run the bot, saving time and preventing unexpected behavior.
+
+### `.pilotscript` Reference Guide
+
+Each waypoint in a script is a JSON object with the following base structure:
+
+```json
+{
+    "label": "Descriptive Label (optional)",
+    "type": "waypointTypeValue",
+    "coordinate": [x, y, z],
+    "options": {},
+    "ignore": false,
+    "passinho": false
+}
+```
+
+-   `label` (string): An optional name for the waypoint (e.g., "Start Point", "Dragon Lair Entrance"). Used by `refillChecker`.
+-   `type` (string): The type of action to perform. See below for valid types.
+-   `coordinate` (array of 3 integers): The `[x, y, z]` map coordinate for the action.
+-   `options` (object): A dictionary of options specific to the waypoint `type`.
+-   `ignore` (boolean): If `true`, the bot attempts to ignore creatures while executing this waypoint (usually for `walk` type).
+-   `passinho` (boolean): If `true`, uses a special movement mode (details may vary).
+
+#### Waypoint Types and Their Options:
+
+Below are the `KNOWN_WAYPOINT_TYPES` and the structure of their `options` object:
+
+*   **`walk`**
+    *   Purpose: Moves the character to the specified `coordinate`.
+    *   `options`: `{}` (must be empty)
+
+*   **`singleMove`**
+    *   Purpose: Moves the character one step from the `coordinate` in a specified direction.
+    *   `options`:
+        *   `direction` (string): Required. Must be one of `"north"`, `"south"`, `"east"`, `"west"`, `"center"`.
+
+*   **`rightClickDirection`**
+    *   Purpose: Performs a right-click one step from the `coordinate` in a specified direction (e.g., to use a ladder down a hole where the hole itself is not walkable).
+    *   `options`:
+        *   `direction` (string): Required. Must be one of `"north"`, `"south"`, `"east"`, `"west"`, `"center"`.
+
+*   **`useRope`**
+    *   Purpose: Uses a rope on the specified `coordinate` (e.g., a rope spot).
+    *   `options`: `{}` (must be empty)
+
+*   **`useShovel`**
+    *   Purpose: Uses a shovel on the specified `coordinate` (e.g., a hole or dirt patch).
+    *   `options`: `{}` (must be empty)
+
+*   **`rightClickUse`**
+    *   Purpose: Performs a right-click directly on the `coordinate` (e.g., to open a chest or use an item).
+    *   `options`: `{}` (must be empty)
+
+*   **`openDoor`**
+    *   Purpose: Attempts to open a door at the `coordinate`.
+    *   `options`: `{}` (must be empty)
+
+*   **`useLadder`**
+    *   Purpose: Attempts to use a ladder at the `coordinate`.
+    *   `options`: `{}` (must be empty)
+
+*   **`moveUp`**
+    *   Purpose: Moves the character up one floor (e.g., stairs, ladders, rope holes from below) from the `coordinate` in a specified on-screen direction.
+    *   `options`:
+        *   `direction` (string): Required. Must be one of `"north"`, `"south"`, `"east"`, `"west"`, `"center"`.
+
+*   **`moveDown`**
+    *   Purpose: Moves the character down one floor (e.g., stairs, holes, ladders from above) from the `coordinate` in a specified on-screen direction.
+    *   `options`:
+        *   `direction` (string): Required. Must be one of `"north"`, `"south"`, `"east"`, `"west"`, `"center"`.
+
+*   **`depositGold`**
+    *   Purpose: Initiates the gold deposit process (assumes NPC/bank is open).
+    *   `options`: `{}` (must be empty)
+
+*   **`depositItems`**
+    *   Purpose: Opens the depot in a specified city and deposits items.
+    *   `options`:
+        *   `city` (string): Required. The name of the city where the depot is located. Valid cities include: `"AbDendriel"`, `"Ankrahmun"`, `"Carlin"`, `"Darashia"`, `"Edron"`, `"Farmine"`, `"Issavi"`, `"Kazoordon"`, `"LibertBay"`, `"PortHope"`, `"Rathleton"`, `"Svargrond"`, `"Thais"`, `"Venore"`, `"Yalahar"`, `"Feyrist"`, `"Dark Mansion"`.
+
+*   **`depositItemsHouse`**
+    *   Purpose: Deposits items into a house chest (assumes chest is open or accessible).
+    *   `options`: `{}` (can be empty)
+        *   `city` (string): Optional. If specified, must be a valid city name (see `depositItems` for list). This might be used for specific house deposit logic if implemented.
+
+*   **`dropFlasks`**
+    *   Purpose: Drops empty flasks.
+    *   `options`: `{}` (must be empty)
+
+*   **`travel`**
+    *   Purpose: Initiates NPC travel to a specified city.
+    *   `options`:
+        *   `city` (string): Required. The destination city or travel keyword. Valid values include: `"AbDendriel"`, `"Ankrahmun"`, `"Carlin"`, `"Darashia"`, `"Edron"`, `"Farmine"`, `"Issavi"`, `"Kazoordon"`, `"LibertBay"`, `"PortHope"`, `"Rathleton"`, `"Svargrond"`, `"Thais"`, `"Venore"`, `"Yalahar"`, `"Tibia"`, `"Peg Leg"`, `"shortcut"`.
+
+*   **`refill`**
+    *   Purpose: Buys potions from an NPC.
+    *   `options`:
+        *   `healthPotionEnabled` (boolean): Required. Set to `true` if health potions should be refilled.
+        *   `houseNpcEnabled` (boolean): Required. Set to `true` if refilling from a house NPC (changes dialog keyword).
+        *   `healthPotion` (object): Required.
+            *   `item` (string): Required. Name of the health potion. Valid names include: `"Health Potion"`, `"Strong Health Potion"`, `"Great Health Potion"`, `"Ultimate Health Potion"`, `"Supreme Health Potion"`, `"Great Spirit Potion"`, `"Ultimate Spirit Potion"`.
+            *   `quantity` (integer): Required. Desired total quantity of this potion.
+        *   `manaPotion` (object): Required.
+            *   `item` (string): Required. Name of the mana potion. Valid names include: `"Mana Potion"`, `"Strong Mana Potion"`, `"Great Mana Potion"`, `"Ultimate Mana Potion"`, `"Great Spirit Potion"`, `"Ultimate Spirit Potion"`.
+            *   `quantity` (integer): Required. Desired total quantity of this potion.
+
+*   **`buyBackpack`**
+    *   Purpose: Buys backpacks from an NPC.
+    *   `options`:
+        *   `name` (string): Required. Name of the backpack. Valid names: `"Orange Backpack"`, `"Red Backpack"`, `"Parcel"`.
+        *   `amount` (integer): Required. Number of backpacks to buy.
+
+*   **`refillChecker`**
+    *   Purpose: Checks supply levels (potions, capacity) and redirects to another labeled waypoint if below thresholds.
+    *   `options`:
+        *   `minimumAmountOfHealthPotions` (integer): Required. Bot goes to refill if health potions are below this.
+        *   `minimumAmountOfManaPotions` (integer): Required. Bot goes to refill if mana potions are below this.
+        *   `minimumAmountOfCap` (integer): Required. Bot goes to refill if capacity is below this.
+        *   `waypointLabelToRedirect` (string): Required. The `label` of the waypoint to go to if refill is needed. This label must exist elsewhere in the script.
+        *   `healthEnabled` (boolean): Required. Set to `true` if health potion count should be considered in the check.
 
 ## 🟢 Features
 

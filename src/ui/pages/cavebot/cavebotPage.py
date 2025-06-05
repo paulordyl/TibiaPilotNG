@@ -11,6 +11,7 @@ from .ignoreCreaturesPage import IgnoreCreaturesPage
 import customtkinter
 import json
 from ...utils import genRanStr
+from src.utils.script_parser import validate_script_content # Added import
 
 class CavebotPage(customtkinter.CTkToplevel):
     def __init__(self, context):
@@ -273,6 +274,13 @@ class CavebotPage(customtkinter.CTkToplevel):
         self.saveConfigFrame.columnconfigure(0, weight=1, uniform='equal')
         self.saveConfigFrame.columnconfigure(1, weight=1, uniform='equal')
 
+        # Adding Validate Script button next to Load/Save
+        validateScriptButton = customtkinter.CTkButton(self.saveConfigFrame, text="Validate Script", corner_radius=32,
+                                                     fg_color="transparent", border_color="#C20034",
+                                                     border_width=2, hover_color="#C20034", command=self.validate_current_script)
+        validateScriptButton.grid(row=1, column=0, columnspan=2, padx=20, pady=(0,20), sticky='nsew')
+
+
     def openBaseModal(self):
         if self.baseModal is None or not self.baseModal.winfo_exists():
             self.baseModal = BaseModal(self, onConfirm=lambda label, options: self.addWaypoint(
@@ -422,3 +430,31 @@ class CavebotPage(customtkinter.CTkToplevel):
                     self.table.insert('', 'end', values=(
                         waypoint['label'], waypoint['type'], waypoint['coordinate'], waypoint['options']))
             messagebox.showinfo('Sucesso', 'Script carregado com sucesso!')
+
+    def validate_current_script(self):
+        current_script_data = self.context.context['ng_cave']['waypoints']['items']
+        if not current_script_data:
+            messagebox.showinfo("Script Validation", "Script is empty. Nothing to validate.")
+            return
+
+        script_json_str = ""
+        try:
+            script_json_str = json.dumps(current_script_data, indent=4)
+        except TypeError as e:
+            messagebox.showerror("Script Validation Error", f"Could not serialize script to JSON: {e}")
+            return
+
+        errors = validate_script_content(script_json_str)
+
+        if not errors:
+            messagebox.showinfo("Script Validation", "Script is valid!")
+        else:
+            # Simple error display for now, join first few errors
+            max_errors_to_show = 5
+            error_display_count = min(len(errors), max_errors_to_show)
+            formatted_errors = "\n".join(errors[:error_display_count])
+            if len(errors) > max_errors_to_show:
+                formatted_errors += f"\n\n... and {len(errors) - max_errors_to_show} more errors."
+
+            # Consider a scrollable error dialog for many errors later
+            messagebox.showerror("Script Validation Failed", f"Script contains errors:\n\n{formatted_errors}")
