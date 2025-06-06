@@ -20,6 +20,7 @@ pub struct ArduinoConfig {
 pub struct GeneralSettings {
     pub character_name: String,
     pub auto_login: bool,
+    pub templates_path: String,
     // TODO: Add other general settings
 }
 

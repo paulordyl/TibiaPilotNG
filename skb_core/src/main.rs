@@ -137,10 +137,10 @@ fn main() -> Result<(), AppError> {
     // Initialize TemplateManager and load templates
     // TemplateManager::load_templates_from_directory will recursively load from subdirectories like "templates/digits/"
     let mut template_manager = TemplateManager::new();
-    match template_manager.load_templates_from_directory("templates") { // Changed path to relative
-        Ok(_) => info!("Templates loaded successfully from templates/ (including subdirectories like digits/ if present)."),
+    match template_manager.load_templates_from_directory(&config.general.templates_path) {
+        Ok(_) => info!("Templates loaded successfully from configured path: {} (including subdirectories like digits/ if present).", config.general.templates_path),
         Err(e) => {
-            error!("Failed to load templates from templates/: {}. Proceeding with empty TemplateManager.", e);
+            error!("Failed to load templates from configured path '{}': {}. Proceeding with empty TemplateManager.", config.general.templates_path, e);
             // This might be acceptable if templates are optional or only for specific features.
         }
     }
