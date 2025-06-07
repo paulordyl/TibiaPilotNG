@@ -50,6 +50,16 @@ pub struct ImageFilterParameters {
 }
 
 #[derive(Deserialize, Debug, Clone)]
+pub struct RadarDataPaths {
+    pub base_path: String,
+    pub floors_imgs_npy: Option<String>,
+    pub floors_paths_npy: Option<String>,
+    pub radar_coords_npy: Option<String>,
+    pub walkable_sqms_npy: Option<String>,
+    pub floor_png_pattern: Option<String>, // e.g., "floor-{}.png"
+}
+
+#[derive(Deserialize, Debug, Clone)]
 pub struct Config {
     pub general: GeneralSettings,
     pub arduino: ArduinoConfig,
@@ -57,6 +67,7 @@ pub struct Config {
     pub player_status_regions: PlayerStatusRegions,
     pub value_type_filter_params: ImageFilterParameters,
     pub non_value_type_filter_params: ImageFilterParameters,
+    pub radar_data: Option<RadarDataPaths>,
 }
 
 /// Loads configuration from a TOML file.
