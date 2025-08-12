@@ -12,6 +12,8 @@ Below I'll leave some images and videos of how it worked, prints of the bot's UI
 
 ## 🎉 🚀 We are thrilled to officially announce PILOTNG REBORN! 🤖✨
 
+![Reborn](docs/assets/images/reborn.png)
+
 After nearly 6 months of intensive testing 🧪 with zero bans 🚫, we are ready to bring to the public a private bot that takes security to the next level.
 💎 Our biggest competitive advantage: security and reliability above all else.
 
