@@ -1,0 +1,12 @@
+[
+  {
+    "label": "test_walkToWaypoint",
+    "type": "walk",
+    "options": {},
+    "coordinate": [
+      1,
+      2,
+      3
+    ]
+  }
+]

@@ -1,0 +1,12 @@
+[
+  {
+    "label": "test_useRopeWaypoint",
+    "type": "useRope",
+    "options": {},
+    "coordinate": [
+      1,
+      2,
+      3
+    ]
+  }
+]

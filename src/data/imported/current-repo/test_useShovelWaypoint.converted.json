@@ -1,0 +1,12 @@
+[
+  {
+    "label": "test_useShovelWaypoint",
+    "type": "useShovel",
+    "options": {},
+    "coordinate": [
+      1,
+      2,
+      3
+    ]
+  }
+]

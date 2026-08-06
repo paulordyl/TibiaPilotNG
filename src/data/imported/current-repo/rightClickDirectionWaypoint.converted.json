@@ -1,0 +1,8 @@
+[
+  {
+    "label": "rightClickDirectionWaypoint",
+    "type": "rightClickDirection",
+    "options": {},
+    "coordinate": null
+  }
+]
