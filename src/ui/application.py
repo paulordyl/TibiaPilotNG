@@ -3,6 +3,7 @@ from tkinter import BooleanVar
 from .pages.config import ConfigPage
 from .pages.comboSpells import ComboSpellsPage
 from .pages.importer import ImporterPage
+from .pages.waypoint_editor import WaypointEditor
 from .pages.inventory import InventoryPage
 from .pages.cavebot.cavebotPage import CavebotPage
 from .pages.healing.healingPage import HealingPage
@@ -61,6 +62,12 @@ class Application(customtkinter.CTk):
                                         command=self.importerWindow)
         importerBtn.grid(row=2, column=0, padx=20, pady=20)
 
+        editorBtn = customtkinter.CTkButton(self, text="Waypoint Editor", corner_radius=32,
+                                        fg_color="transparent", border_color="#C20034",
+                                        border_width=2, hover_color="#C20034",
+                                        command=self.waypointEditorWindow)
+        editorBtn.grid(row=2, column=1, padx=20, pady=20)
+
         self.enabledVar = BooleanVar()
         self.checkbutton = customtkinter.CTkCheckBox(
             self, text='Enabled', variable=self.enabledVar, command=self.onToggleEnabledButton,
@@ -100,6 +107,12 @@ class Application(customtkinter.CTk):
     def importerWindow(self):
         if self.canvasWindow is None or not self.canvasWindow.winfo_exists():
             self.canvasWindow = ImporterPage(self.context)
+        else:
+            self.canvasWindow.focus()
+
+    def waypointEditorWindow(self):
+        if self.canvasWindow is None or not self.canvasWindow.winfo_exists():
+            self.canvasWindow = WaypointEditor(self.context)
         else:
             self.canvasWindow.focus()
 
