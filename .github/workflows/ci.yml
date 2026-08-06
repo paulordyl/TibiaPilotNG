@@ -29,3 +29,25 @@ jobs:
         run: |
           poetry run python -m pytest -q
         shell: bash
+
+  notify:
+    needs: test
+    if: ${{ always() && needs.test.result == 'failure' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Comment on PR when CI fails
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const { context, github } = require('@actions/github');
+            if (context.payload.pull_request) {
+              const pr = context.payload.pull_request.number;
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: pr,
+                body: `CI: Some tests failed. See checks for details.`
+              });
+            } else {
+              console.log('CI failed on push, no PR to comment on.');
+            }
