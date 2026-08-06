@@ -1,4 +1,7 @@
-import serial
+try:
+    import serial
+except Exception:
+    serial = None
 from time import sleep
 import base64
 import os
