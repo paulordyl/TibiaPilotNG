@@ -1,0 +1,27 @@
+{
+  "found": [
+    "file.json",
+    "tests/unit/repositories/radar/core/test_getClosestWaypointIndexFromCoordinate.py",
+    "tests/unit/repositories/radar/core/__pycache__/test_getClosestWaypointIndexFromCoordinate.cpython-311-pytest-7.4.4.pyc",
+    "tests/unit/gameplay/core/tasks/test_walkToWaypoint.py",
+    "tests/unit/gameplay/core/tasks/test_useRopeWaypoint.py",
+    "tests/unit/gameplay/core/tasks/test_useShovelWaypoint.py",
+    "tests/unit/gameplay/core/tasks/__pycache__/test_useRopeWaypoint.cpython-311-pytest-7.4.4.pyc",
+    "tests/unit/gameplay/core/tasks/__pycache__/test_walkToWaypoint.cpython-311-pytest-7.4.4.pyc",
+    "tests/unit/gameplay/core/tasks/__pycache__/test_useShovelWaypoint.cpython-311-pytest-7.4.4.pyc",
+    "src/gameplay/core/waypoint.py",
+    "src/gameplay/core/tasks/useRopeWaypoint.py",
+    "src/gameplay/core/tasks/rightClickUseWaypoint.py",
+    "src/gameplay/core/tasks/useLadderWaypoint.py",
+    "src/gameplay/core/tasks/setNextWaypoint.py",
+    "src/gameplay/core/tasks/openDoorWaypoint.py",
+    "src/gameplay/core/tasks/useShovelWaypoint.py",
+    "src/gameplay/core/tasks/rightClickDirectionWaypoint.py",
+    "src/gameplay/core/tasks/walkToWaypoint.py",
+    "src/gameplay/core/tasks/__pycache__/setNextWaypoint.cpython-311.pyc",
+    "src/gameplay/core/tasks/__pycache__/useRopeWaypoint.cpython-311.pyc",
+    "src/gameplay/core/tasks/__pycache__/walkToWaypoint.cpython-311.pyc",
+    "src/gameplay/core/tasks/__pycache__/useShovelWaypoint.cpython-311.pyc",
+    "src/gameplay/core/__pycache__/waypoint.cpython-311.pyc"
+  ]
+}

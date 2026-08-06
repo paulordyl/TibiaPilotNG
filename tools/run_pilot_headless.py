@@ -26,6 +26,37 @@ class SmokeContext(UIContext):
 
 def main(iterations=200):
     ctx = SmokeContext(default_context)
+    # attempt to load an imported script if present
+    import_path = os.path.join('src', 'data', 'imported', 'current-repo', 'sample_waypoints.json')
+    alt_index = os.path.join('src', 'data', 'imported', 'current-repo', 'waypoints.json')
+    try:
+        if os.path.isfile(import_path):
+            import json
+            with open(import_path, 'r') as fh:
+                data = json.load(fh)
+                if isinstance(data, list):
+                    print('Loading sample_waypoints.json into profile')
+                    ctx.loadScript(data)
+        elif os.path.isfile(alt_index):
+            import json
+            with open(alt_index, 'r') as fh:
+                idx = json.load(fh)
+                # if index references files, attempt to load first json waypoint file
+                found = idx.get('found', [])
+                for p in found:
+                    if p.lower().endswith('.json') and os.path.isfile(p):
+                        try:
+                            with open(p, 'r') as fh2:
+                                data = json.load(fh2)
+                                if isinstance(data, list):
+                                    print('Loaded', p, 'into profile via index')
+                                    ctx.loadScript(data)
+                                    break
+                        except Exception:
+                            continue
+    except Exception as e:
+        print('Error while loading imported scripts:', e)
+
     pilot = PilotNGThread(ctx)
     print('Starting headless pilot loop for', iterations, 'iterations')
     # run limited loop by calling handleGameData/handleGameplayTasks and observers manually
