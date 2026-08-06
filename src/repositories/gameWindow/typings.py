@@ -1,4 +1,7 @@
-from nptyping import NDArray
+try:
+    from nptyping import NDArray
+except Exception:
+    NDArray = None
 import numpy as np
 from typing import Any
 
@@ -13,4 +16,4 @@ Creature = np.dtype([
     ('gameWindowCoordinate', np.uint32, (2,)),
     ('isUnderRoof', np.bool_),
 ])
-CreatureList = NDArray[Any, Any]
+CreatureList = NDArray[Any, Any] if NDArray is not None else Any
