@@ -97,24 +97,83 @@ if __name__ == '__main__':
         sys.path.insert(0, PY_PATH)
     try:
         from src.utils.core import locate, locateMultiple
+        have_project_locate = True
     except Exception as e:
-        print('Failed to import locate from project:', e)
-        sys.exit(1)
+        print('Project locate not available (cv2 missing?):', e)
+        have_project_locate = False
+
+    def pil_to_gray_array(pil_img):
+        # returns 2D list of pixel ints
+        gray = pil_img.convert('L')
+        w, h = gray.size
+        px = list(gray.getdata())
+        # convert to rows
+        rows = [px[i * w:(i + 1) * w] for i in range(h)]
+        return rows
+
+    def locate_fallback(full_img_path, template_img, confidence=0.85):
+        # exact-match fallback using PIL pixel comparison; confidence ignored (exact only)
+        try:
+            from PIL import Image
+            full = Image.open(full_img_path).convert('L')
+        except Exception as e:
+            print('Fallback locate: failed to open full image via PIL:', e)
+            return None
+        full_a = pil_to_gray_array(full)
+        templ_a = pil_to_gray_array(Image.fromarray(template)) if 'numpy' in globals() and template is not None and not isinstance(template, str) else None
+        # template is currently a numpy array if cv2 was available; but in our flow template was saved to disk earlier, so just reload it
+        try:
+            templ = Image.open(TEMPLATE_OUT).convert('L')
+            t_w, t_h = templ.size
+            templ_px = list(templ.getdata())
+            templ_rows = [templ_px[i * t_w:(i + 1) * t_w] for i in range(t_h)]
+        except Exception as e:
+            print('Fallback locate: failed to load template via PIL:', e)
+            return None
+
+        H = len(full_a)
+        W = len(full_a[0])
+        h_t = len(templ_rows)
+        w_t = len(templ_rows[0])
+        for y in range(0, H - h_t + 1):
+            for x in range(0, W - w_t + 1):
+                match = True
+                for ty in range(h_t):
+                    row_full = full_a[y + ty]
+                    row_templ = templ_rows[ty]
+                    # quick slice compare
+                    if row_full[x:x + w_t] != row_templ:
+                        match = False
+                        break
+                if match:
+                    return (x, y, w_t, h_t)
+        return None
+
+    def locateMultiple_fallback(full_img_path, template_img, confidence=0.85):
+        single = locate_fallback(full_img_path, template_img, confidence)
+        return [single] if single else []
 
     print('Running locate (single-match)')
-    try:
-        res = locate(screenshot, template, confidence=0.7)
-    except Exception as e:
-        print('locate threw exception:', e)
-        res = None
+    if have_project_locate:
+        try:
+            res = locate(screenshot, template, confidence=0.7)
+        except Exception as e:
+            print('locate threw exception:', e)
+            res = None
+    else:
+        print('Using fallback exact-match locate (may miss near-matches).')
+        res = locate_fallback(SSHOT, TEMPLATE_OUT, confidence=0.7)
     print('locate result:', res)
 
     print('\nRunning locateMultiple (all matches >= confidence)')
-    try:
-        multi = locateMultiple(screenshot, template, confidence=0.7)
-    except Exception as e:
-        print('locateMultiple threw exception:', e)
-        multi = []
+    if have_project_locate:
+        try:
+            multi = locateMultiple(screenshot, template, confidence=0.7)
+        except Exception as e:
+            print('locateMultiple threw exception:', e)
+            multi = []
+    else:
+        multi = locateMultiple_fallback(SSHOT, TEMPLATE_OUT, confidence=0.7)
     print('Found matches count:', len(multi))
     for m in multi[:20]:
         print('  match:', m)
