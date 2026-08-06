@@ -28,14 +28,17 @@ def main():
     except Exception as e:
         print('Project getScreenshot failed:', e)
 
-    # Fallback to pyautogui
+    # Fallback to pyautogui (use PIL.Image save to avoid numpy/cv2 requirement)
     try:
         import pyautogui
-        import numpy as np
-        import cv2
         img_rgb = pyautogui.screenshot()
-        arr = cv2.cvtColor(np.array(img_rgb), cv2.COLOR_RGB2GRAY)
-        cv2.imwrite(OUT, arr)
+        # img_rgb is a PIL Image — save as grayscale
+        try:
+            img_gray = img_rgb.convert('L')
+            img_gray.save(OUT)
+        except Exception:
+            # If convert fails, save original
+            img_rgb.save(OUT)
         print('Saved fallback screenshot to', OUT)
     except Exception as e:
         print('Failed to capture screenshot with pyautogui:', e)
