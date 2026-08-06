@@ -62,11 +62,21 @@ def parse_rect_from_args():
 
 
 def load_image(path):
-    img = cv2.imread(path, cv2.IMREAD_GRAYSCALE)
-    if img is None:
-        print('Failed to read image:', path)
-        sys.exit(1)
-    return img
+    # Return either a numpy ndarray (grayscale) if cv2 available, or a PIL Image (grayscale)
+    if cv2 is not None:
+        img = cv2.imread(path, cv2.IMREAD_GRAYSCALE)
+        if img is None:
+            print('Failed to read image with cv2:', path)
+            sys.exit(1)
+        return img
+    else:
+        try:
+            from PIL import Image
+            img = Image.open(path).convert('L')
+            return img
+        except Exception as e:
+            print('Failed to read image with PIL:', e)
+            sys.exit(1)
 
 
 if __name__ == '__main__':
@@ -81,15 +91,27 @@ if __name__ == '__main__':
     print(f'Using template rect x={x}, y={y}, w={w}, h={h}')
 
     screenshot = load_image(SSHOT)
-    # guard bounds
-    h_img, w_img = screenshot.shape
-    if x < 0 or y < 0 or x + w > w_img or y + h > h_img:
-        print('Template rect out of bounds for screenshot size', (w_img, h_img))
-        sys.exit(1)
-
-    template = screenshot[y:y+h, x:x+w]
-    cv2.imwrite(TEMPLATE_OUT, template)
-    print('Saved template to', TEMPLATE_OUT)
+    # guard bounds and extract template depending on type
+    if cv2 is not None and hasattr(screenshot, 'shape'):
+        h_img, w_img = screenshot.shape
+        if x < 0 or y < 0 or x + w > w_img or y + h > h_img:
+            print('Template rect out of bounds for screenshot size', (w_img, h_img))
+            sys.exit(1)
+        template = screenshot[y:y+h, x:x+w]
+        cv2.imwrite(TEMPLATE_OUT, template)
+        print('Saved template to', TEMPLATE_OUT)
+    else:
+        # PIL Image
+        from PIL import Image
+        w_img, h_img = screenshot.size
+        if x < 0 or y < 0 or x + w > w_img or y + h > h_img:
+            print('Template rect out of bounds for screenshot size', (w_img, h_img))
+            sys.exit(1)
+        template_pil = screenshot.crop((x, y, x + w, y + h))
+        template_pil.save(TEMPLATE_OUT)
+        print('Saved template to', TEMPLATE_OUT)
+        # keep template variable as None for fallback code which reloads from TEMPLATE_OUT
+        template = None
 
     # Import locate functions from project
     PY_PATH = os.getcwd()
