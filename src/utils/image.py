@@ -1,5 +1,18 @@
-import cv2
-from numba import njit
+# Robust image utilities: avoid hard runtime dependency on numba/cv2; fallback to PIL + numpy
+try:
+    import cv2
+except Exception:
+    cv2 = None
+
+try:
+    from numba import njit
+except Exception:
+    # no-op decorator when numba is not available
+    def njit(**kwargs):
+        def _dec(f):
+            return f
+        return _dec
+
 import numpy as np
 from PIL import Image
 from typing import Union
@@ -54,7 +67,20 @@ def convertGraysToBlack(arr: np.ndarray) -> np.ndarray:
 
 # TODO: add unit tests
 def RGBtoGray(image: np.ndarray) -> GrayImage:
-    return cv2.cvtColor(image, cv2.COLOR_RGB2GRAY)
+    if cv2 is not None:
+        return cv2.cvtColor(image, cv2.COLOR_RGB2GRAY)
+    # assume image is numpy array or PIL image
+    if isinstance(image, np.ndarray):
+        # if shape (h,w,3)
+        if len(image.shape) == 3:
+            return np.dot(image[...,:3], [0.2989, 0.5870, 0.1140]).astype(np.uint8)
+        return image.astype(np.uint8)
+    # try PIL
+    try:
+        pil = Image.fromarray(image)
+        return np.array(pil.convert('L'), dtype=np.uint8)
+    except Exception:
+        return np.array(image, dtype=np.uint8)
 
 
 # TODO: add unit tests
@@ -75,4 +101,8 @@ def crop(image: GrayImage, x: int, y: int, width: int, height: int) -> GrayImage
 
 # TODO: add unit tests
 def load(path: str) -> np.ndarray:
-    return np.array(cv2.cvtColor(cv2.imread(path), cv2.COLOR_BGR2RGB), dtype=np.uint8)
+    if cv2 is not None:
+        return np.array(cv2.cvtColor(cv2.imread(path), cv2.COLOR_BGR2RGB), dtype=np.uint8)
+    # fallback to PIL
+    img = Image.open(path).convert('RGB')
+    return np.array(img, dtype=np.uint8)
