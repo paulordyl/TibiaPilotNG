@@ -10,16 +10,20 @@ class ClickInClosestCreatureTask(BaseTask):
         self.delayOfTimeout = 1
 
     def shouldIgnore(self, context: Context) -> bool:
-        return context['ng_cave']['targetCreature'] is not None
+        return context.get('ng_cave', {}).get('targetCreature') is not None
 
     def do(self, context: Context) -> Context:
-        if context['ng_cave']['isAttackingSomeCreature'] == False:
-            # TODO: find another way (maybe click in battle)
+        if context.get('ng_cave', {}).get('isAttackingSomeCreature', False) == False:
             # attack by mouse click when there are players on screen or ignorable creatures
-            if context['gameWindow']['players'] or context['ng_targeting']['hasIgnorableCreatures']:
-                if context['ng_cave'] and context['ng_cave']['closestCreature'] and context['ng_cave']['closestCreature']['windowCoordinate']:
-                    mouse.rightClick(context['ng_cave']['closestCreature']['windowCoordinate'])
+            if context.get('gameWindow', {}).get('players') or context.get('ng_targeting', {}).get('hasIgnorableCreatures'):
+                closest = context.get('ng_cave', {}).get('closestCreature')
+                if closest and closest.get('windowCoordinate'):
+                    mouse.rightClick(closest['windowCoordinate'])
                 return context
             keyboard.press('space')
 
         return context
+
+    def did(self, context: Context) -> bool:
+        # Consider the task done when the bot is attacking some creature
+        return bool(context.get('ng_cave', {}).get('isAttackingSomeCreature', False))

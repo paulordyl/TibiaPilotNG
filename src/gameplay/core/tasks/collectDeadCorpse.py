@@ -13,6 +13,7 @@ class CollectDeadCorpseTask(BaseTask):
         super().__init__()
         self.name = 'collectDeadCorpse'
         self.creature = creature
+        self.delayBeforeStart = 0.85
 
     def do(self, context: Context) -> Context:
         utilsKeyboard.keyDown('shift')
@@ -68,6 +69,20 @@ class CollectDeadCorpseTask(BaseTask):
         #         if gameplayUtils.coordinatesAreEqual(coordinate, corpseToLoot['coordinate']):
         #         context['loot']['corpsesToLoot'].pop(index)
 
-        context['loot']['corpsesToLoot'] = []
+        # Remove the 3x3 area around the radar coordinate from corpsesToLoot
+        radar_coord = context.get('ng_radar', {}).get('coordinate')
+        if radar_coord is None:
+            return context
+        cx, cy, cz = radar_coord
+        coords_to_remove = set([
+            (cx - 1, cy - 1, cz), (cx, cy - 1, cz), (cx + 1, cy - 1, cz),
+            (cx - 1, cy, cz),     (cx, cy, cz),     (cx + 1, cy, cz),
+            (cx - 1, cy + 1, cz), (cx, cy + 1, cz), (cx + 1, cy + 1, cz),
+        ])
+        remaining = []
+        for corpse in context.get('loot', {}).get('corpsesToLoot', []):
+            if tuple(corpse.get('coordinate')) not in coords_to_remove:
+                remaining.append(corpse)
+        context['loot']['corpsesToLoot'] = remaining
 
         return context

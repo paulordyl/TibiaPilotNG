@@ -28,7 +28,7 @@ class AttackClosestCreatureTask(VectorTask):
 
     # TODO: task should have like 5 retries until all tree is destroyed
     def onBeforeStart(self, context: Context) -> Context:
-        if context['ng_cave']['runToCreatures'] == True:
+        if context.get('ng_cave', {}).get('runToCreatures', False) == True:
             self.tasks = [
                 ClickInClosestCreatureTask().setParentTask(self).setRootTask(self),
                 WalkToTargetCreatureTask().setParentTask(self).setRootTask(self),

@@ -11,6 +11,7 @@ class DropFlasksTask(VectorTask):
         super().__init__()
         self.name = 'dropFlasks'
         self.isRootTask = True
+        self.delayBeforeStart = 1
 
     def onBeforeStart(self, context: Context) -> Context:
         self.tasks = [
