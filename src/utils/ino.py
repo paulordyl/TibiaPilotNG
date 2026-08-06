@@ -51,6 +51,34 @@ def sendCommandArduino(command):
                 elif cmd == 'scroll' and len(parts) >= 4:
                     clicks = int(float(parts[3]))
                     pyautogui.scroll(clicks)
+                elif cmd == 'write' and len(parts) >= 2:
+                    # everything after the first comma is the phrase
+                    phrase = command[len('write,'):]
+                    pyautogui.write(phrase)
+                elif cmd == 'press' and len(parts) >= 2:
+                    # press an ascii code or named key
+                    keyarg = parts[1]
+                    try:
+                        # attempt numeric ascii -> char
+                        code = int(keyarg)
+                        pyautogui.press(chr(code))
+                    except Exception:
+                        # fallback to pressing the literal string
+                        pyautogui.press(keyarg)
+                elif cmd == 'keyDown' and len(parts) >= 2:
+                    keyarg = parts[1]
+                    try:
+                        code = int(keyarg)
+                        pyautogui.keyDown(chr(code))
+                    except Exception:
+                        pyautogui.keyDown(keyarg)
+                elif cmd == 'keyUp' and len(parts) >= 2:
+                    keyarg = parts[1]
+                    try:
+                        code = int(keyarg)
+                        pyautogui.keyUp(chr(code))
+                    except Exception:
+                        pyautogui.keyUp(keyarg)
                 else:
                     print(f'Unrecognized Arduino simulated command: {command}')
             except Exception as e:
