@@ -1,4 +1,8 @@
-from nptyping import NDArray
+try:
+    from nptyping import NDArray
+except Exception:
+    NDArray = None
+
 from typing import Any, List, Tuple, Union
 
 
@@ -8,11 +12,15 @@ CoordinateList = List[Coordinate]
 CreatureCategory = str
 CreatureCategoryOrUnknown = Union[CreatureCategory, 'unknown']
 Direction = Union['up', Union['down', Union['left', 'right']]]
-# TODO: fix it
-GrayImage = NDArray[Any, Any]
+# Use Any if NDArray is not available at runtime
+if NDArray is None:
+    GrayImage = Any
+    GrayVector = Any
+else:
+    GrayImage = NDArray[Any, Any]
+    GrayVector = NDArray[Any, Any]
+
 GrayPixel = int
-# TODO: fix it
-GrayVector = NDArray[Any, Any]
 Slot = Tuple[int, int]
 SlotWidth = 32 | 64
 Waypoint = Any
