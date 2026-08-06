@@ -14,8 +14,15 @@ This script will:
 
 import os
 import sys
-import cv2
-import numpy as np
+# local import of cv2 is optional; use PIL fallback for drawing if cv2 not available
+try:
+    import cv2
+except Exception:
+    cv2 = None
+try:
+    import numpy as np
+except Exception:
+    np = None
 
 TOOLS_DIR = os.path.dirname(__file__)
 SSHOT = os.path.join(TOOLS_DIR, 'latest_screenshot.png')
@@ -113,12 +120,30 @@ if __name__ == '__main__':
         print('  match:', m)
 
     # Draw rectangles on a color copy to visualize
-    color = cv2.cvtColor(screenshot, cv2.COLOR_GRAY2BGR)
-    for m in (multi if isinstance(multi, list) else ([] if multi is None else [multi])):
+    if cv2 is not None:
+        color = cv2.cvtColor(screenshot, cv2.COLOR_GRAY2BGR)
+        for m in (multi if isinstance(multi, list) else ([] if multi is None else [multi])):
+            try:
+                x0, y0, w0, h0 = m
+                cv2.rectangle(color, (x0, y0), (x0 + w0, y0 + h0), (0, 0, 255), 2)
+            except Exception:
+                pass
+        cv2.imwrite(MATCH_OUT, color)
+        print('Saved matches visualization to', MATCH_OUT)
+    else:
+        # Use PIL for drawing if cv2 not available
         try:
-            x0, y0, w0, h0 = m
-            cv2.rectangle(color, (x0, y0), (x0 + w0, y0 + h0), (0, 0, 255), 2)
-        except Exception:
-            pass
-    cv2.imwrite(MATCH_OUT, color)
-    print('Saved matches visualization to', MATCH_OUT)
+            from PIL import Image, ImageDraw
+            pil_img = Image.open(SSHOT).convert('RGB')
+            draw = ImageDraw.Draw(pil_img)
+            for m in (multi if isinstance(multi, list) else ([] if multi is None else [multi])):
+                try:
+                    x0, y0, w0, h0 = m
+                    draw.rectangle([x0, y0, x0 + w0, y0 + h0], outline=(255, 0, 0), width=3)
+                except Exception:
+                    pass
+            pil_img.save(MATCH_OUT)
+            print('Saved matches visualization to', MATCH_OUT)
+        except Exception as e:
+            print('No cv2 or PIL available to draw matches:', e)
+            print('Skipping matches visualization')
