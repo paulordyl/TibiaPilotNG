@@ -18,7 +18,9 @@ class ClickInClosestCreatureTask(BaseTask):
             if context.get('gameWindow', {}).get('players') or context.get('ng_targeting', {}).get('hasIgnorableCreatures'):
                 closest = context.get('ng_cave', {}).get('closestCreature')
                 if closest and closest.get('windowCoordinate'):
-                    mouse.rightClick(closest['windowCoordinate'])
+                    keyboard.keyDown('alt')
+                    mouse.leftClick(closest['windowCoordinate'])
+                    keyboard.keyUp('alt')
                 return context
             keyboard.press('space')
 
